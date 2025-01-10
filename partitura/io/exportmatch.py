@@ -422,7 +422,7 @@ def matchfile_from_alignment(
         duplicates[tuple(v)] = idx
     voice_overlap_note_ids = []
     if len(duplicates) > 0:
-        duplicate_idx = np.concatenate(np.array(list(duplicates.values()))).flatten()
+        duplicate_idx = np.hstack(list(duplicates.values()))
         voice_overlap_note_ids = list(sna[duplicate_idx]["id"])
 
     for al_note in alignment:
