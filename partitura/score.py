@@ -4452,7 +4452,7 @@ class Segment(TimedObject):
         self.info = info
 
 
-def add_segments(part):
+def add_segments(part, force_new = False):
     """
     Add segment objects to a part based on repetition and capo/fine/coda/segno directions.
 
@@ -4461,9 +4461,14 @@ def add_segments(part):
     part: part
         A score part
     """
-    if len([seg for seg in part.iter_all(Segment)]) > 0:
+    existing_segments = [seg for seg in part.iter_all(Segment)]
+    if len(existing_segments) > 0:
         # only add segments if no segments exist
-        pass
+        if force_new:
+            for seg in existing_segments:
+                part.remove(seg)
+        else:
+            pass
     else:
         boundaries = defaultdict(dict)
         destinations = defaultdict(list)
@@ -5029,7 +5034,7 @@ def get_paths(part, no_repeats=False, all_repeats=False, ignore_leap_info=True):
     segments = get_segments(part)
     paths = list()
     unfold_paths(
-        Path(["A"], segments, no_repeats=no_repeats, all_repeats=all_repeats),
+        Path([chr(65)], segments, no_repeats=no_repeats, all_repeats=all_repeats),
         paths,
         ignore_leap_info=ignore_leap_info,
     )
