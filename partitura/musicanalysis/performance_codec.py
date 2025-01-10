@@ -608,8 +608,8 @@ def tempo_by_derivative(
 
 @deprecated_alias(part="score", ppart="performance")
 def to_matched_score(
-    score: ScoreLike,
-    performance: PerformanceLike,
+    score: Union[ScoreLike, np.ndarray],
+    performance: Union[PerformanceLike, np.ndarray],
     alignment: list,
     include_score_markings=False,
 ):
@@ -635,7 +635,7 @@ def to_matched_score(
             a["score_id"] = str(a["score_id"])
 
     feature_functions = None
-    if include_score_markings:
+    if include_score_markings and not isinstance(score, np.ndarray):
         feature_functions = [
             "loudness_direction_feature",
             "articulation_feature",
@@ -643,8 +643,18 @@ def to_matched_score(
             "slur_feature",
         ]
 
-    na = note_features.compute_note_array(score, feature_functions=feature_functions)
-    p_na = performance.note_array()
+    if isinstance(score, np.ndarray):
+        na = score
+    else:
+        na = note_features.compute_note_array(
+            score,
+            feature_functions=feature_functions,
+        )
+
+    if isinstance(performance, np.ndarray):
+        p_na = performance
+    else:
+        p_na = performance.note_array()
     part_by_id = dict((n["id"], na[na["id"] == n["id"]]) for n in na)
     ppart_by_id = dict((n["id"], p_na[p_na["id"] == n["id"]]) for n in p_na)
 
@@ -682,7 +692,7 @@ def to_matched_score(
         ("p_duration", "f4"),
         ("velocity", "i4"),
     ]
-    if include_score_markings:
+    if include_score_markings and not isinstance(score, np.ndarray):
         fields += [("voice", "i4")]
         fields += [
             (field, sn.dtype.fields[field][0])
@@ -747,27 +757,23 @@ def get_time_maps_from_alignment(
 
     # Remove grace notes
     if remove_ornaments:
-        # TODO: check that all onsets have a duration?
+        # check that all onsets have a duration
         # ornaments (grace notes) do not have a duration
-        score_unique_onset_idxs = np.array(
-            [
-                np.where(np.logical_and(score_onsets == u, score_durations > 0))[0]
-                for u in score_unique_onsets
-            ],
-            dtype=object,
-        )
+        score_unique_onset_idxs = [
+            np.where(np.logical_and(score_onsets == u, score_durations > 0))[0]
+            for u in score_unique_onsets
+        ]
 
     else:
-        score_unique_onset_idxs = np.array(
-            [np.where(score_onsets == u)[0] for u in score_unique_onsets],
-            dtype=object,
-        )
+        score_unique_onset_idxs = [
+            np.where(score_onsets == u)[0] for u in score_unique_onsets
+        ]
 
     # For chords, we use the average performed onset as a proxy for
     # representing the "performeance time" of the position of the score
     # onsets
     eq_perf_onsets = np.array(
-        [np.mean(perf_onsets[u]) for u in score_unique_onset_idxs]
+        [np.mean(perf_onsets[u.astype(int)]) for u in score_unique_onset_idxs]
     )
 
     # Get maps
@@ -827,6 +833,14 @@ def get_matched_notes(spart_note_array, ppart_note_array, alignment):
                 s_idx = int(s_idx)
                 p_idx = int(p_idx)
                 matched_idxs.append((s_idx, p_idx))
+
+    if len(matched_idxs) == 0:
+        warnings.warn(
+            "No matched note IDs found. "
+            "Either the alignment contains no matches "
+            "or the IDs in score of performance do not correspond to the alignment "
+            "(maybe due to repeat unfolding)."
+        )
 
     return np.array(matched_idxs)
 

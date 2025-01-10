@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://music-encoding.org/schema/5.0/mei-all.rng" type="application/xml" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<?xml-model href="https://music-encoding.org/schema/5.0/mei-all.rng" type="application/xml" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<mei xmlns="http://www.music-encoding.org/ns/mei" meiversion="5.0">
+   <meiHead xml:id="m7kmp7y">
+      <fileDesc xml:id="fj27vth">
+         <titleStmt xml:id="trvhoky">
+            <title>Untitled score</title>
+            <respStmt>
+               <persName role="composer">Composer / arranger</persName>
+            </respStmt>
+         </titleStmt>
+         <pubStmt xml:id="pzfkijo">
+            <date isodate="2024-10-29" type="encoding-date">2024-10-29</date>
+         </pubStmt>
+      </fileDesc>
+      <encodingDesc xml:id="e1bogqho">
+         <appInfo xml:id="a1adqay9">
+            <application xml:id="a15hoxom" isodate="2024-10-29T12:14:31" version="4.3.1-3b8cc17">
+               <name xml:id="n97143i">Verovio</name>
+               <p xml:id="p1sgrsp8">Transcoded from MusicXML</p>
+            </application>
+         </appInfo>
+      </encodingDesc>
+   </meiHead>
+   <music>
+      <body>
+         <mdiv xml:id="mx7ldm8">
+            <score xml:id="s14lg4za">
+               <scoreDef xml:id="s1wrsas">
+                  <pgHead xml:id="p1fjl1ib">
+                     <rend xml:id="r1ayrxqc" halign="center" valign="top">Untitled score</rend>
+                     <rend xml:id="rnrv4t2" halign="center" valign="top">Subtitle</rend>
+                     <rend xml:id="r1laeti4" halign="right" valign="top">Composer / arranger</rend>
+                  </pgHead>
+                  <staffGrp xml:id="sux06yn">
+                     <staffGrp xml:id="P1" bar.thru="true">
+                        <grpSym xml:id="g1bkd2ga" symbol="brace" />
+                        <label xml:id="l6yzwmw">Piano</label>
+                        <labelAbbr xml:id="lbngto1">Pno.</labelAbbr>
+                        <instrDef xml:id="ikujyak" midi.channel="0" midi.instrnum="0" midi.volume="78.00%" />
+                        <staffDef xml:id="s1a1vt1v" n="1" lines="5" ppq="2">
+                           <clef xml:id="c1c2w4j4" shape="G" line="2" />
+                           <keySig xml:id="kr9fje" sig="0" />
+                           <meterSig xml:id="mswmv21" count="4" unit="4" />
+                        </staffDef>
+                        <staffDef xml:id="sp27d86" n="2" lines="5" ppq="2">
+                           <clef xml:id="cfzq6so" shape="F" line="4" />
+                           <keySig xml:id="k1vpcnv" sig="0" />
+                           <meterSig xml:id="m1d36l8x" count="4" unit="4" />
+                        </staffDef>
+                     </staffGrp>
+                  </staffGrp>
+               </scoreDef>
+               <section xml:id="smr5d8x">
+                  <pb xml:id="p14matiy" />
+                  <measure xml:id="m177xd3" n="1">
+                     <staff xml:id="s1avacjc" n="1">
+                        <layer xml:id="lmfju8r" n="1">
+                           <note xml:id="n4fj8yh" dur.ppq="8" dur="1" oct="4" pname="b" />
+                        </layer>
+                        <layer xml:id="l9fo0jr" n="2">
+                           <note xml:id="nphl5rd" dur.ppq="2" dur="4" oct="4" pname="g" stem.dir="down" />
+                           <rest xml:id="rs3ak5f" dur.ppq="2" dur="4" />
+                           <rest xml:id="r12bwbuu" dur.ppq="4" dur="2" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="soyrn26" n="2">
+                        <layer xml:id="l1aymbd8" n="5">
+                           <beam xml:id="b13u80g6">
+                              <note xml:id="nm7rkwd" dur.ppq="1" dur="8" oct="3" pname="c" stem.dir="up" />
+                              <note xml:id="n169yzsa" dur.ppq="1" dur="8" oct="3" pname="g" stem.dir="up" />
+                              <note xml:id="n1xnt5f7" dur.ppq="1" dur="8" staff="1" oct="4" pname="d" stem.dir="down" />
+                              <note xml:id="nmjpkjn" dur.ppq="1" dur="8" oct="3" pname="b" stem.dir="up" />
+                           </beam>
+                           <beam xml:id="b9l3hou">
+                              <note xml:id="n1sg31ps" dur.ppq="1" dur="8" staff="1" oct="4" pname="d" stem.dir="down" />
+                              <note xml:id="n1ecbas2" dur.ppq="1" dur="8" staff="1" oct="4" pname="e" stem.dir="down" />
+                           </beam>
+                           <rest xml:id="rauvew" dur.ppq="2" dur="4" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1snul2l" n="2">
+                     <staff xml:id="s15t09bd" n="1">
+                        <layer xml:id="lzmfhkp" n="1">
+                           <mRest xml:id="m1xz1x0d" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="shz0eur" n="2">
+                        <layer xml:id="l1iciad8" n="5">
+                           <mRest xml:id="m1cf8v9u" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1qc8y9q" n="3">
+                     <staff xml:id="se44k8e" n="1">
+                        <layer xml:id="l1ltci35" n="1">
+                           <mRest xml:id="m1351o1o" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1h93obp" n="2">
+                        <layer xml:id="l1vj3669" n="5">
+                           <mRest xml:id="m1lzb952" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mi9o4au" n="4">
+                     <staff xml:id="sm5106m" n="1">
+                        <layer xml:id="l89qr" n="1">
+                           <mRest xml:id="m1dn09na" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s10sirhg" n="2">
+                        <layer xml:id="llazpz3" n="5">
+                           <mRest xml:id="myhdadb" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1ywux7x" n="5">
+                     <staff xml:id="s1p8zugr" n="1">
+                        <layer xml:id="ltp6yqm" n="1">
+                           <mRest xml:id="m17tmjcs" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="shq5uns" n="2">
+                        <layer xml:id="l1v4rsug" n="5">
+                           <mRest xml:id="m1ss2ci8" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1o5j0kz" n="6">
+                     <staff xml:id="sp3e494" n="1">
+                        <layer xml:id="lgwglan" n="1">
+                           <mRest xml:id="m1ijlbva" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sxjastf" n="2">
+                        <layer xml:id="l7g0wfj" n="5">
+                           <mRest xml:id="mpejasj" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1nt3vpd" n="7">
+                     <staff xml:id="sqx172v" n="1">
+                        <layer xml:id="l3m8heb" n="1">
+                           <mRest xml:id="m4q0fjo" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="shv0uqr" n="2">
+                        <layer xml:id="lvah308" n="5">
+                           <mRest xml:id="m8jcfsi" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m9vhmyv" n="8">
+                     <staff xml:id="s1dvush8" n="1">
+                        <layer xml:id="l161s3hy" n="1">
+                           <mRest xml:id="m1rmkgj0" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1ye80hz" n="2">
+                        <layer xml:id="lgjb0e2" n="5">
+                           <mRest xml:id="m1v5qw2o" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m11i8thl" n="9">
+                     <staff xml:id="s2f5ml5" n="1">
+                        <layer xml:id="lw19nku" n="1">
+                           <mRest xml:id="m1vahuql" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sha23rd" n="2">
+                        <layer xml:id="l298nb" n="5">
+                           <mRest xml:id="m4jw4y5" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <sb xml:id="s1nn06u8" />
+                  <measure xml:id="mu6rju6" n="10">
+                     <staff xml:id="s1uzs8eu" n="1">
+                        <layer xml:id="l1hz2pcf" n="1">
+                           <mRest xml:id="m18ecitx" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sixcgas" n="2">
+                        <layer xml:id="lkj2xdp" n="5">
+                           <mRest xml:id="mdxapx4" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m11gv1fd" n="11">
+                     <staff xml:id="sq5wf3k" n="1">
+                        <layer xml:id="l1vmznnx" n="1">
+                           <mRest xml:id="myg6jlg" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s10f13po" n="2">
+                        <layer xml:id="l1nwg61z" n="5">
+                           <mRest xml:id="mfi8f1s" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m17glgtq" n="12">
+                     <staff xml:id="s187k20e" n="1">
+                        <layer xml:id="leqxg1l" n="1">
+                           <mRest xml:id="m1vpa1dp" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1diqosg" n="2">
+                        <layer xml:id="lftm6t8" n="5">
+                           <mRest xml:id="m1aq2v3b" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mganhge" n="13">
+                     <staff xml:id="s12pwlsy" n="1">
+                        <layer xml:id="l1gzdyt7" n="1">
+                           <mRest xml:id="m1pb48vy" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sw0blt9" n="2">
+                        <layer xml:id="lmonex2" n="5">
+                           <mRest xml:id="mui9a0b" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1ycs5bk" n="14">
+                     <staff xml:id="s1ux44gh" n="1">
+                        <layer xml:id="lrznlpq" n="1">
+                           <mRest xml:id="m1wv33j1" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sdt26js" n="2">
+                        <layer xml:id="l1s6segc" n="5">
+                           <mRest xml:id="m1yavffa" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="magmgwy" n="15">
+                     <staff xml:id="s1jg9dr3" n="1">
+                        <layer xml:id="l15vgbew" n="1">
+                           <mRest xml:id="m18tvjwk" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sdcsjb7" n="2">
+                        <layer xml:id="l1fndlgm" n="5">
+                           <mRest xml:id="m26l80h" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mlezf9o" n="16">
+                     <staff xml:id="s1an7v2g" n="1">
+                        <layer xml:id="l1hs2dy8" n="1">
+                           <mRest xml:id="m1rk2j3o" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s7tkpb0" n="2">
+                        <layer xml:id="l1w1xf47" n="5">
+                           <mRest xml:id="m2k0ahj" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m2ojtyj" n="17">
+                     <staff xml:id="s1c8yttl" n="1">
+                        <layer xml:id="l1oz8orr" n="1">
+                           <mRest xml:id="mqlypv6" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sla97h8" n="2">
+                        <layer xml:id="l1ca27ja" n="5">
+                           <mRest xml:id="muxv4nu" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m5mhvci" n="18">
+                     <staff xml:id="s2sj6v0" n="1">
+                        <layer xml:id="l11nk5o5" n="1">
+                           <mRest xml:id="mmmc2ta" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s7admyz" n="2">
+                        <layer xml:id="ld1zjoq" n="5">
+                           <mRest xml:id="muf40x6" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m71mw0j" n="19">
+                     <staff xml:id="s1o427ni" n="1">
+                        <layer xml:id="l1nkj4vp" n="1">
+                           <mRest xml:id="m52kbs0" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1q6zsug" n="2">
+                        <layer xml:id="l1tpul44" n="5">
+                           <mRest xml:id="m1ci7f3s" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1v6d6h2" n="20">
+                     <staff xml:id="sngqwgn" n="1">
+                        <layer xml:id="l19b5zas" n="1">
+                           <mRest xml:id="mmw8i8i" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1lbamoe" n="2">
+                        <layer xml:id="lldcvl5" n="5">
+                           <mRest xml:id="m17ax1n2" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1x2bbiq" n="21">
+                     <staff xml:id="s5jrhvo" n="1">
+                        <layer xml:id="lajv223" n="1">
+                           <mRest xml:id="m1bnetuv" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s75a66t" n="2">
+                        <layer xml:id="l2nrewm" n="5">
+                           <mRest xml:id="m12d73p" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <sb xml:id="s1um888t" />
+                  <measure xml:id="mc0cd02" n="22">
+                     <staff xml:id="sx7tmk1" n="1">
+                        <layer xml:id="l1xtgq2r" n="1">
+                           <mRest xml:id="m16afxce" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sjrjoo1" n="2">
+                        <layer xml:id="l1qelu7s" n="5">
+                           <mRest xml:id="m9d14ud" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m83u0zr" n="23">
+                     <staff xml:id="sb9iuy9" n="1">
+                        <layer xml:id="loyyc6f" n="1">
+                           <mRest xml:id="mccjg9d" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="skkpw4o" n="2">
+                        <layer xml:id="l159xz9w" n="5">
+                           <mRest xml:id="m4rso5x" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mutuqd" n="24">
+                     <staff xml:id="s1asbuyr" n="1">
+                        <layer xml:id="ln2l4zn" n="1">
+                           <mRest xml:id="m483jbt" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sm2jkyg" n="2">
+                        <layer xml:id="l5e4dvi" n="5">
+                           <mRest xml:id="m8tf3zl" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mlvv6ih" n="25">
+                     <staff xml:id="swqiy0e" n="1">
+                        <layer xml:id="l15em9yv" n="1">
+                           <mRest xml:id="mu1cikf" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s4s98tg" n="2">
+                        <layer xml:id="lwez51h" n="5">
+                           <mRest xml:id="mpv2rbd" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m194bkyt" n="26">
+                     <staff xml:id="s1dht4cr" n="1">
+                        <layer xml:id="l10i0jp0" n="1">
+                           <mRest xml:id="mpuaihh" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1gh4b8w" n="2">
+                        <layer xml:id="l1bc79is" n="5">
+                           <mRest xml:id="mi7ye5o" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mjrsomv" n="27">
+                     <staff xml:id="skml285" n="1">
+                        <layer xml:id="l5ugem7" n="1">
+                           <mRest xml:id="ms9albi" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s14ogcxc" n="2">
+                        <layer xml:id="l5muo2n" n="5">
+                           <mRest xml:id="m9lte24" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mdu3jzc" n="28">
+                     <staff xml:id="s32g34k" n="1">
+                        <layer xml:id="l1x06jis" n="1">
+                           <mRest xml:id="m1w8x9c4" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sn6bqmz" n="2">
+                        <layer xml:id="l1a91pke" n="5">
+                           <mRest xml:id="m8r1342" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1ijmks9" n="29">
+                     <staff xml:id="s16b4kgs" n="1">
+                        <layer xml:id="l1e85z3e" n="1">
+                           <mRest xml:id="mw0jppm" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1wr3z36" n="2">
+                        <layer xml:id="lxghq6i" n="5">
+                           <mRest xml:id="m1rk8d6x" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="meqfxb3" n="30">
+                     <staff xml:id="s1dunwv6" n="1">
+                        <layer xml:id="lzpdpxs" n="1">
+                           <mRest xml:id="m1rturv6" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s1gvjdl3" n="2">
+                        <layer xml:id="l12ncp0o" n="5">
+                           <mRest xml:id="mm1o79o" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="mctplfm" n="31">
+                     <staff xml:id="s5dk30k" n="1">
+                        <layer xml:id="l15xpvtc" n="1">
+                           <mRest xml:id="mazksqu" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="s44p3mx" n="2">
+                        <layer xml:id="ldz2u8m" n="5">
+                           <mRest xml:id="mhnlr0l" />
+                        </layer>
+                     </staff>
+                  </measure>
+                  <measure xml:id="m1k00gte" right="end" n="32">
+                     <staff xml:id="s1q3dsh7" n="1">
+                        <layer xml:id="l1vk962l" n="1">
+                           <mRest xml:id="m1ft3cst" />
+                        </layer>
+                     </staff>
+                     <staff xml:id="sl7nt2t" n="2">
+                        <layer xml:id="l1qvmhb0" n="5">
+                           <mRest xml:id="m1r9sbul" />
+                        </layer>
+                     </staff>
+                  </measure>
+               </section>
+            </score>
+         </mdiv>
+      </body>
+   </music>
+</mei>

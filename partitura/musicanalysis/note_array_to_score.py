@@ -190,7 +190,7 @@ def create_part(
     warnings.warn("add measures", stacklevel=2)
 
     if not barebones and anacrusis_divs > 0:
-        part.add(score.Measure(0), 0, anacrusis_divs)
+        part.add(score.Measure(number=1, name=str(0)), 0, anacrusis_divs)
 
     if not barebones and sanitize:
         warnings.warn("Inferring measures", stacklevel=2)

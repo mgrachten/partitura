@@ -70,6 +70,15 @@ KERN_DURS = {
 }
 
 
+class KernElement(object):
+    def __init__(self, element):
+        self.editorial_start = True if "ossia" in element else False
+        self.editorial_end = True if "Xstrophe" in element else False
+        self.voice_end = True if "*v" in element else False
+        self.voice_start = True if "*^" in element else False
+        self.element = element.replace("*", "")
+
+
 def add_durations(a, b):
     return a * b / (a + b)
 
@@ -102,8 +111,10 @@ def parse_by_voice(file: list, dtype=np.object_):
         data[line, voice] = file[line][voice]
     data = data.T
     if num_voices > 1:
-        # Copy global lines from the first voice to all other voices
+        # Copy global lines from the first voice to all other voices unless they are the string "*S/ossia"
         cp_idx = np.char.startswith(data[0], "*")
+        un_idx = np.char.startswith(data[0], "*S/ossia")
+        cp_idx = np.logical_and(cp_idx, ~un_idx)
         for i in range(1, num_voices):
             data[i][cp_idx] = data[0][cp_idx]
         # Copy Measure Lines from the first voice to all other voices
@@ -171,10 +182,16 @@ def element_parsing(
 ):
     divs_pq = part._quarter_durations[0]
     current_tl_pos = 0
+    editorial = False
     measure_mapping = {m.number: m.start.t for m in part.iter_all(spt.Measure)}
     for i in range(elements.shape[0]):
         element = elements[i]
-        if element is None:
+        if isinstance(element, KernElement):
+            if element.editorial_start:
+                editorial = True
+            if element.editorial_end:
+                editorial = False
+        if element is None or editorial:
             continue
         if isinstance(element, spt.GenericNote):
             if total_duration_values[i] == 0:
@@ -250,9 +267,6 @@ def load_kern(
     )
     # Get Splines
     splines = file[1:].T[note_parts]
-    # Inverse Order
-    splines = splines[::-1]
-    parsing_idxs = parsing_idxs[::-1]
     prev_staff = 1
     has_instrument = np.char.startswith(splines, "*I")
     # if all parts have the same instrument, then they are the same part.
@@ -351,7 +365,8 @@ def load_kern(
     )
 
     doc_name = get_document_name(filename)
-    score = spt.Score(partlist=partlist, id=doc_name)
+    # inversing the partlist results to correct part order and visualization for exporting musicxml files
+    score = spt.Score(partlist=partlist[::-1], id=doc_name)
     return score
 
 
@@ -430,17 +445,15 @@ class SplineParser(object):
         self.tie_prev = np.zeros(note_num, dtype=bool)
         notes = np.vectorize(self.meta_note_line, otypes=[object])(spline[note_mask])
         self.total_duration_values[note_mask] = self.note_duration_values
-        # shift tie_next by one to the right
+        # Notes should appear in order within stream so shift tie_next by one to the right
+        # and tie next and inversingly tie_prev also
+        # Case of note to chord tie or chord to note tie is not handled yet
         for note, to_tie in np.c_[
             notes[self.tie_next], notes[np.roll(self.tie_next, -1)]
         ]:
             to_tie.tie_next = note
-            # note.tie_prev = to_tie
-        for note, to_tie in np.c_[
-            notes[self.tie_prev], notes[np.roll(self.tie_prev, 1)]
-        ]:
             note.tie_prev = to_tie
-            # to_tie.tie_next = note
+
         elements[note_mask] = notes
 
         # Find Slur indices, i.e. where spline cells contain "(" or ")"
@@ -505,6 +518,8 @@ class SplineParser(object):
             return self.process_key_line(rest)
         elif line.startswith("*-"):
             return self.process_fine()
+        else:
+            return KernElement(element=line)
 
     def process_tempo_line(self, line: str):
         return spt.Tempo(float(line))
@@ -561,7 +576,7 @@ class SplineParser(object):
             else:
                 raise ValueError("Unrecognized clef line: {}".format(line))
         else:
-            clef_line = has_line.group(0)
+            clef_line = int(has_line.group(0))
         if octave_change and clef_line == 2 and clef == "G":
             octave = -1
         elif octave_change:

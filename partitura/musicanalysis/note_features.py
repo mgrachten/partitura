@@ -11,8 +11,9 @@ import partitura.score as score
 
 import types
 from typing import List, Union, Tuple
-from partitura.utils import ensure_notearray, ensure_rest_array
+from partitura.utils import ensure_notearray, ensure_rest_array, clef_sign_to_int
 from partitura.score import ScoreLike
+from collections import defaultdict
 
 __all__ = [
     "list_note_feats_functions",
@@ -131,6 +132,16 @@ def make_note_features(
         include_grace_notes=True,
         include_time_signature=True,
     )
+
+    if len(set(na["id"])) != len(na):
+        warnings.warn(
+            "Length of note array {0} "
+            "does not correspond to number of unique IDs {1}. "
+            "Some feature functions may return spurious values.".format(
+                len(na), len(set(na["id"]))
+            )
+        )
+
     acc = []
     if isinstance(feature_functions, str) and feature_functions == "all":
         feature_functions = list_note_feats_functions()
@@ -255,6 +266,15 @@ def make_rest_features(
     )
     if na.size == 0:
         return np.array([])
+
+    if len(set(na["id"])) != len(na):
+        warnings.warn(
+            "Length of rest array {0} "
+            "does not correspond to number of unique IDs {1}. "
+            "Some feature functions may return spurious values.".format(
+                len(na), len(set(na["id"]))
+            )
+        )
 
     acc = []
     if isinstance(feature_functions, str) and feature_functions == "all":
@@ -524,6 +544,65 @@ def grace_feature(na, part, **kwargs):
             else 0
         )
     return W, feature_names
+
+
+def clef_feature(na, part, **kwargs):
+    """Clef feature
+
+    This feature encodes the current clef of the staff of each note.
+    Note that this feature does not return the staff number per note,
+    see staff_feature for this information.
+    """
+    notes = {n.id: n for n in part.notes_tied}
+    names = ["clef_sign", "clef_line", "clef_octave_change"]
+    clef_dict = defaultdict(list)
+    staff_numbers = set()
+    clef_list = [clef for clef in part.iter_all(score.Clef)]
+    if len(clef_list) > 0:
+        for clef in clef_list:
+            staff = clef.staff or 1
+            staff_numbers.add(staff)
+            time_key = "time_" + str(staff)
+            clef_key = "clef_" + str(staff)
+            clef_dict[time_key].append(clef.start.t)
+            clef_dict[clef_key].append(clef)
+
+        for staff in staff_numbers:
+            time_key = "time_" + str(staff)
+            interpolator_key = "interp_" + str(staff)
+            start_times = np.array(clef_dict[time_key])
+            clef_indices = np.arange(len(start_times))
+            interpolator = interp1d(
+                start_times,
+                clef_indices,
+                kind="previous",
+                bounds_error=False,
+                fill_value="extrapolate",
+            )
+            clef_dict[interpolator_key].append(interpolator)
+
+        W = np.zeros((len(notes), 3))
+        for i, na_n in enumerate(na):
+            n = notes[na_n["id"]]
+            staff = n.staff or 1
+            time = n.start.t
+            clef_key = "clef_" + str(staff)
+            interpolator_key = "interp_" + str(staff)
+            clef_idx = clef_dict[interpolator_key][0](time)
+            clef = clef_dict[clef_key][int(clef_idx)]
+            sign = clef.sign or "none"
+            W[i, 0] = clef_sign_to_int(sign)
+            W[i, 1] = clef.line or 0
+            W[i, 2] = clef.octave_change or 0
+
+    else:
+        # add dummy clef
+        W = np.zeros((len(notes), 3))
+        W[:, 0] = 6  # "none"
+        W[:, 1] = 0
+        W[:, 2] = 0
+
+    return W, names
 
 
 def loudness_direction_feature(na, part, **kwargs):
@@ -872,9 +951,10 @@ def articulation_feature(na, part, **kwargs):
         force_size = False
 
     feature_by_name = {}
-    notes = part.notes_tied if not np.all(na["pitch"] == 0) else part.rests
+    notes = {n.id: n for n in part.notes_tied}
     N = len(notes)
-    for i, n in enumerate(notes):
+    for i, na_n in enumerate(na):
+        n = notes[na_n["id"]]
         if n.articulations:
             for art in n.articulations:
                 if art in names:
@@ -929,9 +1009,10 @@ def ornament_feature(na, part, **kwargs):
         "other-ornament",
     ]
     feature_by_name = {}
-    notes = part.notes_tied
+    notes = {n.id: n for n in part.notes_tied}
     N = len(notes)
-    for i, n in enumerate(notes):
+    for i, na_n in enumerate(na):
+        n = notes[na_n["id"]]
         if n.ornaments:
             for art in n.ornaments:
                 if art in names:
@@ -1008,13 +1089,15 @@ def metrical_feature(na, part, **kwargs):
     non-zero value in the 'metrical_4_4_weak' descriptor.
 
     """
-    notes = part.notes_tied if not np.all(na["pitch"] == 0) else part.rests
+    notes_list = part.notes_tied if not np.all(na["pitch"] == 0) else part.rests
+    notes = {n.id: n for n in notes_list}
     ts_map = part.time_signature_map
     bm = part.beat_map
     feature_by_name = {}
     eps = 10**-6
 
-    for i, n in enumerate(notes):
+    for i, na_n in enumerate(na):
+        n = notes[na_n["id"]]
         beats, beat_type, mus_beats = ts_map(n.start.t).astype(int)
         measure = next(n.start.iter_prev(score.Measure, eq=True), None)
 
@@ -1049,6 +1132,12 @@ def metrical_strength_feature(na, part, **kwargs):
 
     This feature encodes the beat phase (relative position of a note within
     the measure), as well as metrical strength of common time signatures.
+
+    'beat_phase' encodes the position in the measure as value between 0.0 and 1.0
+    'metrical_strength_downbeat' is 1.0 on downbeats, 0.0 elsewhere
+    'metrical_strength_secondary' is 1.0 on measure midpoint, 0.0 elsewhere,
+        not valid for triple meters
+    'metrical_strength_weak' is 1.0 where both others are 0.0, 0.0 elsewhere
     """
     names = [
         "beat_phase",
@@ -1063,7 +1152,48 @@ def metrical_strength_feature(na, part, **kwargs):
     W[:, 0] = np.divide(relod, totmd)  # Onset Phase
     W[:, 1] = na["is_downbeat"].astype(float)
     W[:, 2][W[:, 0] == 0.5] = 1.00
-    W[:, 3][np.nonzero(np.add(W[:, 1], W[:, 0]) == 1.00)] = 1.00
+    W[:, 3][W[:, 1] == W[:, 2]] = 1.00
+
+    return W, names
+
+
+def measure_feature(na, part, **kwargs):
+    """Measure feature
+
+    This feature encodes the measure each note is in.
+
+    """
+    notes_list = part.notes_tied if not np.all(na["pitch"] == 0) else part.rests
+    notes = {n.id: n for n in notes_list}
+    bm = part.beat_map
+
+    global_start = bm(part.first_point.t)
+    global_end = bm(part.last_point.t)
+    global_number = 0  # default global measure number
+
+    names = [
+        "measure_number",
+        "measure_start_beat",
+        "measure_end_beat",
+    ]
+    W = np.zeros((len(notes), 3))
+
+    for i, na_n in enumerate(na):
+        n = notes[na_n["id"]]
+        measure = next(n.start.iter_prev(score.Measure, eq=True), None)
+
+        if measure:
+            start = bm(measure.start.t)
+            end = bm(measure.end.t)
+            number = measure.number
+        else:
+            start = global_start
+            end = global_end
+            number = global_number
+
+        W[i, 0] = number
+        W[i, 1] = start
+        W[i, 2] = end
 
     return W, names
 

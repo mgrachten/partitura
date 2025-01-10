@@ -212,6 +212,11 @@ class TestMusicXML(unittest.TestCase):
         part1 = make_part_slur()
         self._pretty_export_import_pretty_test(part1)
 
+    def test_stem_direction_import(self):
+        # test if stem direction is imported correctly for the first note of test_note_ties.xml
+        part = load_musicxml(MUSICXML_IMPORT_EXPORT_TESTFILES[0])[0]
+        self.assertEqual(part.notes_tied[0].stem_direction, "up")
+
     def _pretty_export_import_pretty_test(self, part1):
         # pretty print the part
         pstring1 = part1.pretty()

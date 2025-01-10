@@ -81,6 +81,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -105,6 +106,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -129,6 +131,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -147,6 +150,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -159,6 +163,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -177,6 +182,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -285,6 +291,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>
@@ -309,6 +316,7 @@
         </pitch>
         <duration>2</duration>
         <voice>1</voice>
+        <stem>up</stem>
         <type>half</type>
       </note>
     </measure>

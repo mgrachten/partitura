@@ -3,6 +3,7 @@
 """
 This module contains methods for importing MEI files.
 """
+import os
 from collections import OrderedDict
 from lxml import etree
 from fractions import Fraction
@@ -64,6 +65,9 @@ def load_mei(filename: PathLike) -> score.Score:
 
 class MeiParser(object):
     def __init__(self, mei_path: PathLike) -> None:
+        # check if the file exists. Verovio won't complain if it doesn't
+        if not os.path.exists(mei_path):
+            raise FileNotFoundError(f"File {mei_path} not found.")
         document, ns = self._parse_mei(mei_path, use_verovio=VEROVIO_AVAILABLE)
         self.document = document
         self.ns = ns  # the namespace in the MEI file
@@ -322,11 +326,9 @@ class MeiParser(object):
                 # find the staff number
                 parent = element.getparent()
                 if parent.tag == self._ns_name("staffDef"):
-                    # number = parent.attrib["n"]
-                    number = 1
+                    number = parent.attrib.get("n", 1)
                 else:  # go back another level to staff element
-                    # number = parent.getparent().attrib["n"]
-                    number = 1
+                    number = parent.getparent().attrib.get("n", 1)
                 sign = element.attrib["shape"]
                 line = element.attrib["line"]
                 octave = self._compute_clef_octave(
@@ -641,6 +643,10 @@ class MeiParser(object):
         note_id, duration, symbolic_duration = self._duration_info(note_el, part)
         # find if it's grace
         grace_attr = note_el.get("grace")
+        # find if it has a different staff specification (for staff crossings)
+        different_staff = note_el.get("staff")
+        if different_staff is not None:
+            staff = int(different_staff)
         if grace_attr is None:
             # create normal note
             note = score.Note(
@@ -649,7 +655,7 @@ class MeiParser(object):
                 alter=alter,
                 id=note_id,
                 voice=voice,
-                staff=1,
+                staff=staff,
                 symbolic_duration=symbolic_duration,
                 articulations=None,  # TODO : add articulation
             )
@@ -668,7 +674,7 @@ class MeiParser(object):
                 alter=alter,
                 id=note_id,
                 voice=voice,
-                staff=1,
+                staff=staff,
                 symbolic_duration=symbolic_duration,
                 articulations=None,  # TODO : add articulation
             )
@@ -702,11 +708,15 @@ class MeiParser(object):
         """
         # find duration info
         rest_id, duration, symbolic_duration = self._duration_info(rest_el, part)
+        # find if it has a different staff specification (for staff crossings)
+        different_staff = rest_el.get("staff")
+        if different_staff is not None:
+            staff = int(different_staff)
         # create rest
         rest = score.Rest(
             id=rest_id,
             voice=voice,
-            staff=1,
+            staff=staff,
             symbolic_duration=symbolic_duration,
             articulations=None,
         )
@@ -744,12 +754,16 @@ class MeiParser(object):
         # find divs per measure
         ppq = part.quarter_duration_map(position)
         parts_per_measure = int(ppq * 4 * last_ts.beats / last_ts.beat_type)
+        # find if it has a different staff specification (for staff crossings)
+        different_staff = mrest_el.get("staff")
+        if different_staff is not None:
+            staff = int(different_staff)
 
         # create dummy rest to insert in the timeline
         rest = score.Rest(
             id=mrest_id,
             voice=voice,
-            staff=1,
+            staff=staff,
             symbolic_duration=estimate_symbolic_duration(parts_per_measure, ppq),
             articulations=None,
         )
@@ -793,12 +807,16 @@ class MeiParser(object):
         # find divs per measure
         ppq = part.quarter_duration_map(position)
         parts_per_measure = int(ppq * 4 * last_ts.beats / last_ts.beat_type)
+        # find if it has a different staff specification (for staff crossings)
+        different_staff = multirest_el.get("staff")
+        if different_staff is not None:
+            staff = int(different_staff)
 
         # create dummy rest to insert in the timeline
         rest = score.Rest(
             id=multirest_id,
             voice=voice,
-            staff=1,
+            staff=staff,
             symbolic_duration=estimate_symbolic_duration(parts_per_measure, ppq),
             articulations=None,
         )
@@ -832,12 +850,22 @@ class MeiParser(object):
         """
         # find duration info
         chord_id, duration, symbolic_duration = self._duration_info(chord_el, part)
+        # find if the entire chord has a different staff specification (for staff crossings)
+        different_staff = chord_el.get("staff")
+        if different_staff is not None:
+            staff = int(different_staff)
         # find notes info
         notes_el = chord_el.findall(self._ns_name("note"))
         for note_el in notes_el:
             note_id = note_el.attrib[self._ns_name("id", XML_NAMESPACE)]
             # find pitch info
             step, octave, alter = self._pitch_info(note_el)
+            # find if single notes have a different staff specification
+            different_staff = note_el.get("staff")
+            if different_staff is not None:
+                note_staff = int(different_staff)
+            else:
+                note_staff = staff
             # create note
             note = score.Note(
                 step=step,
@@ -845,7 +873,7 @@ class MeiParser(object):
                 alter=alter,
                 id=note_id,
                 voice=voice,
-                staff=1,
+                staff=note_staff,
                 symbolic_duration=symbolic_duration,
                 articulations=None,  # TODO : add articulation
             )
@@ -982,7 +1010,11 @@ class MeiParser(object):
         for i_layer, layer_el in enumerate(layers_el):
             end_positions.append(
                 self._handle_layer_in_staff_in_measure(
-                    layer_el, i_layer + 1, staff_ind, position, part
+                    layer_el,
+                    int(layer_el.attrib.get("n", i_layer + 1)),
+                    staff_ind,
+                    position,
+                    part,
                 )
             )
         # check if layers have equal duration (bad encoding, but it often happens)
@@ -1063,7 +1095,11 @@ class MeiParser(object):
                 for i_s, (part, staff_el) in enumerate(zip(parts, staves_el)):
                     end_positions.append(
                         self._handle_staff_in_measure(
-                            staff_el, i_s + 1, position, part, measure_number
+                            staff_el,
+                            int(staff_el.attrib.get("n", i_s + 1)),
+                            position,
+                            part,
+                            measure_number,
                         )
                     )
                 # handle directives (dir elements)
