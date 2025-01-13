@@ -1145,7 +1145,7 @@ def compute_pianoroll(
     if time_div == "auto":
         if onset_unit in ("onset_beat", "onset_quarter", "onset_sec"):
             time_div = 8
-        elif onset_unit == "onset_div":
+        elif onset_unit in ("onset_div", "onset_tick"):
             time_div = 1
     else:
         time_div = int(time_div)
