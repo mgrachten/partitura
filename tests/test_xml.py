@@ -15,6 +15,7 @@ from tests import (
     MUSICXML_UNFOLD_COMPLEX,
     MUSICXML_UNFOLD_VOLTA,
     MUSICXML_UNFOLD_DACAPO,
+    MUSICXML_IGNORE_INVISIBLE_OBJECTS,
 )
 
 from partitura import load_musicxml, save_musicxml
@@ -255,6 +256,29 @@ class TestMusicXML(unittest.TestCase):
 
         self.assertTrue(score.work_title == test_work_title)
         self.assertTrue(score.work_number == test_work_number)
+
+    def test_import_ignore_invisible_objects(self):
+        score_w_invisible = load_musicxml(MUSICXML_IGNORE_INVISIBLE_OBJECTS[0])[0]
+        score_wo_invisible = load_musicxml(MUSICXML_IGNORE_INVISIBLE_OBJECTS[0], ignore_invisible_objects=True)[0]
+
+        score_w_invisible_objs = set(map(str, score_w_invisible.iter_all()))
+        score_wo_invisible_objs = set(map(str, score_wo_invisible.iter_all()))
+
+        self.assertTrue(score_wo_invisible_objs.issubset(score_w_invisible_objs))
+
+        diff = score_w_invisible_objs - score_wo_invisible_objs
+        invisible_objects = {
+            "4--8 Note id=None voice=5 staff=2 type=quarter pitch=D3",
+            "8--12 Rest id=None voice=5 staff=2 type=quarter",
+            "12--13 Note id=None voice=2 staff=1 type=16th pitch=C4",
+            "13--14 Note id=None voice=2 staff=1 type=16th pitch=D4",
+            "14--15 Note id=None voice=2 staff=1 type=16th pitch=C4",
+            "15--16 Note id=None voice=2 staff=1 type=16th pitch=D4",
+            "12--16 Beam",
+        }
+        self.assertEqual(diff, invisible_objects)
+
+
 
 
 def make_part_slur():
