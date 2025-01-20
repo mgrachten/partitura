@@ -171,6 +171,35 @@ def iter_subclasses(cls, _seen=None):
                 yield sub
 
 
+def first_order_derivative(func, x0, dx=0.5):
+    """
+    Compute the first order derivative of a function at a point `x0` using
+    Parameters
+    ----------
+    func: callable
+        Function to differentiate
+    x0: np.ndarray
+        Points at which to differentiate
+    dx: float
+        Step size
+
+    Returns
+    -------
+    np.ndarray
+        First order derivative of `func` at `x0`
+    """
+    # fixed order
+    n = 1
+    # fixed number of points to use, must be odd.
+    num_points = 3
+    weights = np.array([-1, 0, 1]) / 2.0
+    val = 0.0
+    ho = num_points >> 1
+    for k in range(num_points):
+        val += weights[k] * func(x0 + (k - ho) * dx)
+    return val / np.prod((dx,) * n, axis=0)
+
+
 class ReplaceRefMixin(object):
     """This class is a utility mixin class to replace references to
     objects with references to other objects. This is functionality is

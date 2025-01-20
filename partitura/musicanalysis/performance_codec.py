@@ -14,9 +14,9 @@ from partitura.score import Part, ScoreLike
 from partitura.performance import PerformedPart, PerformanceLike
 from partitura.musicanalysis import note_features
 from partitura.utils.misc import deprecated_alias
-from partitura.utils.generic import interp1d, monotonize_times
+from partitura.utils.generic import interp1d, monotonize_times, first_order_derivative
 from partitura.utils.music import ensure_notearray
-from scipy.misc import derivative
+
 
 __all__ = ["encode_performance", "decode_performance", "to_matched_score"]
 
@@ -595,7 +595,7 @@ def tempo_by_derivative(
     if input_onsets is None:
         input_onsets = unique_s_onsets[:-1]
 
-    tempo_curve = derivative(onset_fun, input_onsets, dx=0.5)
+    tempo_curve = first_order_derivative(onset_fun, input_onsets, dx=0.5)
 
     if return_onset_idxs:
         return tempo_curve, input_onsets, unique_onset_idxs
