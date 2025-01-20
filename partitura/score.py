@@ -4483,7 +4483,7 @@ class Segment(TimedObject):
         self.info = info
 
 
-def add_segments(part):
+def add_segments(part, force_new = False):
     """
     Add segment objects to a part based on repetition and capo/fine/coda/segno directions.
 
@@ -4491,275 +4491,274 @@ def add_segments(part):
     ----------
     part: part
         A score part
+    force_new: all_repeats : bool, optional
+        Flag to delete and add segments from scratch, 
+        used for creating new unfoldings after segment attributes have been changed.
+        defaults to false.
     """
-    if len([seg for seg in part.iter_all(Segment)]) > 0:
-        # only add segments if no segments exist
-        pass
-    else:
-        boundaries = defaultdict(dict)
-        destinations = defaultdict(list)
+    existing_segments = [seg for seg in part.iter_all(Segment)]
+    if len(existing_segments) > 0:
+        if force_new:
+            for seg in existing_segments:
+                part.remove(seg)
+        else:
+            return
+    
+    boundaries = defaultdict(dict)
+    destinations = defaultdict(list)
 
-        valid_repeats = [
-            r
-            for r in part.iter_all(Repeat)
-            if r.start is not None and r.end is not None
-        ]
-        valid_endings = [
-            r
-            for r in part.iter_all(Ending)
-            if r.start is not None and r.end is not None
-        ]
+    valid_repeats = [
+        r
+        for r in part.iter_all(Repeat)
+        if r.start is not None and r.end is not None
+    ]
+    valid_endings = [
+        r
+        for r in part.iter_all(Ending)
+        if r.start is not None and r.end is not None
+    ]
 
-        for r in valid_repeats:
-            boundaries[r.start.t]["repeat_start"] = r
-            boundaries[r.end.t]["repeat_end"] = r
-        for v in valid_endings:
-            boundaries[v.start.t]["volta_start"] = v
-            boundaries[v.end.t]["volta_end"] = v
-        for c in part.iter_all(Coda):
-            boundaries[c.start.t]["coda"] = c
-            destinations["coda"].append(c.start.t)
-        for c in part.iter_all(ToCoda):
-            boundaries[c.start.t]["tocoda"] = c
-        for c in part.iter_all(DaCapo):
-            boundaries[c.start.t]["dacapo"] = c
-        for c in part.iter_all(Fine):
-            boundaries[c.start.t]["fine"] = c
-        for c in part.iter_all(Segno):
-            boundaries[c.start.t]["segno"] = c
-            destinations["segno"].append(c.start.t)
-        for c in part.iter_all(DalSegno):
-            boundaries[c.start.t]["dalsegno"] = c
+    for r in valid_repeats:
+        boundaries[r.start.t]["repeat_start"] = r
+        boundaries[r.end.t]["repeat_end"] = r
+    for v in valid_endings:
+        boundaries[v.start.t]["volta_start"] = v
+        boundaries[v.end.t]["volta_end"] = v
+    for c in part.iter_all(Coda):
+        boundaries[c.start.t]["coda"] = c
+        destinations["coda"].append(c.start.t)
+    for c in part.iter_all(ToCoda):
+        boundaries[c.start.t]["tocoda"] = c
+    for c in part.iter_all(DaCapo):
+        boundaries[c.start.t]["dacapo"] = c
+    for c in part.iter_all(Fine):
+        boundaries[c.start.t]["fine"] = c
+    for c in part.iter_all(Segno):
+        boundaries[c.start.t]["segno"] = c
+        destinations["segno"].append(c.start.t)
+    for c in part.iter_all(DalSegno):
+        boundaries[c.start.t]["dalsegno"] = c
 
-        boundaries[part.last_point.t]["end"] = None
-        boundaries[part.first_point.t]["start"] = None
+    boundaries[part.last_point.t]["end"] = None
+    boundaries[part.first_point.t]["start"] = None
 
-        boundary_times = list(boundaries.keys())
-        boundary_times.sort()
+    boundary_times = list(boundaries.keys())
+    boundary_times.sort()
 
-        # for every segment get an id, its jump destinations and properties
-        init_character = 65
-        segment_info = dict()
-        for i, (s, e) in enumerate(zip(boundary_times[:-1], boundary_times[1:])):
-            segment_info[s] = {
-                "ID": chr(init_character + i),
-                "start": s,
-                "end": e,
-                "to": [],
-                "force_full_sequence": False,
-                "type": "default",
-                "info": list(),
-                "volta_numbers": list(),
-            }
-        segment_info[boundary_times[-1]] = {"ID": "END"}
+    # for every segment get an id, its jump destinations and properties
+    init_character = 65
+    segment_info = dict()
+    for i, (s, e) in enumerate(zip(boundary_times[:-1], boundary_times[1:])):
+        segment_info[s] = {
+            "ID": chr(init_character + i),
+            "start": s,
+            "end": e,
+            "to": [],
+            "force_full_sequence": False,
+            "type": "default",
+            "info": list(),
+            "volta_numbers": list(),
+        }
+    segment_info[boundary_times[-1]] = {"ID": "END"}
 
-        current_volta_repeat_start = 0
-        current_volta_end = 0
-        current_volta_total_number = 0
+    current_volta_repeat_start = 0
+    current_volta_end = 0
+    current_volta_total_number = 0
 
-        for ss in boundary_times[:-1]:
-            se = segment_info[ss]["end"]
+    for ss in boundary_times[:-1]:
+        se = segment_info[ss]["end"]
 
-            # loop through the boundaries at the end of current segment
-            for boundary_type in boundaries[se].keys():
-                # REPEATS
-                if boundary_type == "repeat_start":
+        # loop through the boundaries at the end of current segment
+        for boundary_type in boundaries[se].keys():
+            # REPEATS
+            if boundary_type == "repeat_start":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+            if boundary_type == "repeat_end":
+                if "volta_end" not in list(boundaries[se].keys()):
                     segment_info[ss]["to"].append(segment_info[se]["ID"])
-                if boundary_type == "repeat_end":
-                    if "volta_end" not in list(boundaries[se].keys()):
-                        segment_info[ss]["to"].append(segment_info[se]["ID"])
-                        repeat_start = boundaries[se][boundary_type].start.t
-                        segment_info[ss]["to"].append(segment_info[repeat_start]["ID"])
-                    segment_info[ss]["info"].append("repeat_end")
+                    repeat_start = boundaries[se][boundary_type].start.t
+                    segment_info[ss]["to"].append(segment_info[repeat_start]["ID"])
+                segment_info[ss]["info"].append("repeat_end")
 
-                # VOLTA BRACKETS
-                if boundary_type == "volta_start":
-                    if "volta_end" not in list(boundaries[se].keys()):
-                        current_volta_total_number = 0
-                        current_volta_end = se
-                        for volta_number in range(
-                            10
-                        ):  # maximal expected number of volta brackets 10
-                            if "volta_start" in list(
-                                boundaries[current_volta_end].keys()
-                            ):
-                                # add the beginning to the jump destinations
-                                numbers = boundaries[current_volta_end][
-                                    "volta_start"
-                                ].number.split(",")
-                                numbers = [str(int(n)) for n in numbers]
-                                current_volta_total_number += len(numbers)
-                                for no in numbers:
-                                    segment_info[ss]["to"].append(
-                                        no
-                                        + "_Volta_"
-                                        + segment_info[current_volta_end]["ID"]
-                                    )
-                                segment_info[current_volta_end]["info"].append(
-                                    "volta " + ",".join(numbers)
+            # VOLTA BRACKETS
+            if boundary_type == "volta_start":
+                if "volta_end" not in list(boundaries[se].keys()):
+                    current_volta_total_number = 0
+                    current_volta_end = se
+                    for volta_number in range(
+                        10
+                    ):  # maximal expected number of volta brackets 10
+                        if "volta_start" in list(
+                            boundaries[current_volta_end].keys()
+                        ):
+                            # add the beginning to the jump destinations
+                            numbers = boundaries[current_volta_end][
+                                "volta_start"
+                            ].number.split(",")
+                            numbers = [str(int(n)) for n in numbers]
+                            current_volta_total_number += len(numbers)
+                            for no in numbers:
+                                segment_info[ss]["to"].append(
+                                    no
+                                    + "_Volta_"
+                                    + segment_info[current_volta_end]["ID"]
                                 )
-                                segment_info[current_volta_end][
-                                    "volta_numbers"
-                                ] += numbers
-                                # segment_info[bracket_end]["info"].append(str(len(numbers)))
-                                # update the search time to the end of the ext bracket
-                                current_volta_end = boundaries[current_volta_end][
-                                    "volta_start"
-                                ].end.t
-
-                if boundary_type == "volta_end":
-                    current_volta_numbers = segment_info[ss]["volta_numbers"]
-                    for vn in current_volta_numbers:
-                        if vn != str(current_volta_total_number):
-                            # if repeating volta bracket, jump back to start
-                            # check if repeat exists (might not be for 3+ volta brackets)
-                            if "repeat_end" in list(boundaries[se].keys()):
-                                current_volta_repeat_start = max(
-                                    boundaries[se]["repeat_end"].start.t,
-                                    current_volta_repeat_start,
-                                )
-                            repeat_start = current_volta_repeat_start
-                            segment_info[ss]["to"].append(
-                                "Z_Volta_" + segment_info[repeat_start]["ID"]
+                            segment_info[current_volta_end]["info"].append(
+                                "volta " + ",".join(numbers)
                             )
+                            segment_info[current_volta_end][
+                                "volta_numbers"
+                            ] += numbers
+                            # segment_info[bracket_end]["info"].append(str(len(numbers)))
+                            # update the search time to the end of the ext bracket
+                            current_volta_end = boundaries[current_volta_end][
+                                "volta_start"
+                            ].end.t
 
-                    if str(current_volta_total_number) in current_volta_numbers:
-                        # else just go to the segment after the last
+            if boundary_type == "volta_end":
+                current_volta_numbers = segment_info[ss]["volta_numbers"]
+                for vn in current_volta_numbers:
+                    if vn != str(current_volta_total_number):
+                        # if repeating volta bracket, jump back to start
+                        # check if repeat exists (might not be for 3+ volta brackets)
+                        if "repeat_end" in list(boundaries[se].keys()):
+                            current_volta_repeat_start = max(
+                                boundaries[se]["repeat_end"].start.t,
+                                current_volta_repeat_start,
+                            )
+                        repeat_start = current_volta_repeat_start
                         segment_info[ss]["to"].append(
-                            segment_info[current_volta_end]["ID"]
+                            "Z_Volta_" + segment_info[repeat_start]["ID"]
                         )
 
-                # NAVIGATION SYMBOLS
-
-                # Navigation1_ = destinations that should only be used after all others
-                # Navigation2_ = destinations that are used *after* a jump
-                if boundary_type == "coda":
-                    # if a coda symbol is passed just continue
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    segment_info[se]["type"] = "leap_end"
-                    segment_info[se]["info"].append("Coda")
-
-                if boundary_type == "tocoda":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # find the coda and jump there
-                    coda_time = destinations["coda"][0]
+                if str(current_volta_total_number) in current_volta_numbers:
+                    # else just go to the segment after the last
                     segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[coda_time]["ID"]
+                        segment_info[current_volta_end]["ID"]
                     )
-                    segment_info[ss]["type"] = "leap_start"
-                    segment_info[ss]["info"].append("al coda")
 
-                if boundary_type == "segno":
-                    # if a segno symbol is passed just continue
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    segment_info[se]["type"] = "leap_end"
-                    segment_info[se]["info"].append("segno")
+            # NAVIGATION SYMBOLS
 
-                if boundary_type == "dalsegno":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # find the segno and jump there
-                    segno_time = destinations["segno"][0]
-                    segment_info[ss]["to"].append(
-                        "Navigation1_" + segment_info[segno_time]["ID"]
-                    )
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[se]["ID"]
-                    )
-                    segment_info[ss]["type"] = "leap_start"
-                    segment_info[ss]["info"].append("dal segno")
+            # Navigation1_ = destinations that should only be used after all others
+            # Navigation2_ = destinations that are used *after* a jump
+            if boundary_type == "coda":
+                # if a coda symbol is passed just continue
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                segment_info[se]["type"] = "leap_end"
+                segment_info[se]["info"].append("Coda")
 
-                if boundary_type == "dacapo":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # jump to the start
-                    segment_info[ss]["to"].append(
-                        "Navigation1_" + segment_info[part.first_point.t]["ID"]
-                    )
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[se]["ID"]
-                    )
-                    segment_info[ss]["type"] = "leap_start"
-                    segment_info[ss]["info"].append("da capo")
+            if boundary_type == "tocoda":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # find the coda and jump there
+                coda_time = destinations["coda"][0]
+                segment_info[ss]["to"].append(
+                    "Navigation2_" + segment_info[coda_time]["ID"]
+                )
+                segment_info[ss]["type"] = "leap_start"
+                segment_info[ss]["info"].append("al coda")
 
-                if boundary_type == "fine":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # jump to the start
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[part.last_point.t]["ID"]
-                    )
-                    segment_info[ss]["info"].append("fine")
+            if boundary_type == "segno":
+                # if a segno symbol is passed just continue
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                segment_info[se]["type"] = "leap_end"
+                segment_info[se]["info"].append("segno")
 
-                # GENERIC
-                if boundary_type == "end":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
+            if boundary_type == "dalsegno":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # find the segno and jump there
+                segno_time = destinations["segno"][0]
+                segment_info[ss]["to"].append(
+                    "Navigation1_" + segment_info[segno_time]["ID"]
+                )
+                segment_info[ss]["to"].append(
+                    "Navigation2_" + segment_info[se]["ID"]
+                )
+                segment_info[ss]["type"] = "leap_start"
+                segment_info[ss]["info"].append("dal segno")
 
-                # first segments is always a leap destination (da capo)
-                if ss == 0:
-                    segment_info[ss]["type"] = "leap_end"
+            if boundary_type == "dacapo":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # jump to the start
+                segment_info[ss]["to"].append(
+                    "Navigation1_" + segment_info[part.first_point.t]["ID"]
+                )
+                segment_info[ss]["to"].append(
+                    "Navigation2_" + segment_info[se]["ID"]
+                )
+                segment_info[ss]["type"] = "leap_start"
+                segment_info[ss]["info"].append("da capo")
 
-        # clean up and ORDER all the jump destination information
-        for start_time in boundary_times[:-1]:
-            destinations = segment_info[start_time]["to"]
-            destinations_no_volta = [
-                dest
-                for dest in destinations
-                if "Volta_" not in dest and "Navigation" not in dest
-            ]
-            destinations_volta = [dest for dest in destinations if "Volta_" in dest]
-            # dal segno and da capo
-            destinations_navigation1 = [
-                dest[12:] for dest in destinations if "Navigation1_" in dest
-            ]
-            # al coda and fine
-            destinations_navigation2 = [
-                dest[12:] for dest in destinations if "Navigation2_" in dest
-            ]
+            if boundary_type == "fine":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # jump to the start
+                segment_info[ss]["to"].append(
+                    "Navigation2_" + segment_info[part.last_point.t]["ID"]
+                )
+                segment_info[ss]["info"].append("fine")
 
-            # sort the repeats by ascending segment ID
-            destinations_no_volta = list(set(destinations_no_volta))
-            # make sure the "END" destination is the last
-            destinations_except_await = (
-                destinations_volta + destinations_no_volta + destinations_navigation1
-            )
-            if "END" in destinations_except_await:
-                while "END" in destinations_no_volta:
-                    destinations_no_volta.remove("END")
-                destinations_navigation1.append("END")
+            # GENERIC
+            if boundary_type == "end":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
 
-            # sort repeat destinations by ascending ID
-            destinations_no_volta.sort()
-            # sort destinations by volta number
-            destinations_volta.sort()
-            # keep only the segment IDs
-            destinations_volta = [d[8:] for d in destinations_volta]
-            # don't jump to volta brackets w/t number
-            destinations_no_volta = [
-                d for d in destinations_no_volta if d not in destinations_volta
-            ]
-            destinations_cleaned = (
-                destinations_volta + destinations_no_volta + destinations_navigation1
-            )
+            # first segments is always a leap destination (da capo)
+            if ss == 0:
+                segment_info[ss]["type"] = "leap_end"
 
-            # if len(destinations_navigation2) > 0:
-            #     # keep only jumps to the past
-            #     await_to = [idx for idx in destinations_cleaned if idx <= segment_info[start_time]["ID"]]
-            #     # add the waiting destinations
-            #     await_to += destinations_navigation2
+    # clean up and ORDER all the jump destination information
+    for start_time in boundary_times[:-1]:
+        destinations = segment_info[start_time]["to"]
+        destinations_no_volta = [
+            dest
+            for dest in destinations
+            if "Volta_" not in dest and "Navigation" not in dest
+        ]
+        destinations_volta = [dest for dest in destinations if "Volta_" in dest]
+        # dal segno and da capo
+        destinations_navigation1 = [
+            dest[12:] for dest in destinations if "Navigation1_" in dest
+        ]
+        # al coda and fine
+        destinations_navigation2 = [
+            dest[12:] for dest in destinations if "Navigation2_" in dest
+        ]
 
-            # else:
-            #     await_to = destinations_cleaned
+        # sort the repeats by ascending segment ID
+        destinations_no_volta = list(set(destinations_no_volta))
+        # make sure the "END" destination is the last
+        destinations_except_await = (
+            destinations_volta + destinations_no_volta + destinations_navigation1
+        )
+        if "END" in destinations_except_await:
+            while "END" in destinations_no_volta:
+                destinations_no_volta.remove("END")
+            destinations_navigation1.append("END")
 
-            part.add(
-                Segment(
-                    id=segment_info[start_time]["ID"],
-                    to=destinations_cleaned,
-                    await_to=destinations_navigation2,  # await_to,
-                    force_seq=segment_info[start_time]["force_full_sequence"],
-                    type=segment_info[start_time]["type"],
-                    info=", ".join(segment_info[start_time]["info"]),
-                ),
-                segment_info[start_time]["start"],
-                segment_info[start_time]["end"],
-            )
+        # sort repeat destinations by ascending ID
+        destinations_no_volta.sort()
+        # sort destinations by volta number
+        destinations_volta.sort()
+        # keep only the segment IDs
+        destinations_volta = [d[8:] for d in destinations_volta]
+        # don't jump to volta brackets w/t number
+        destinations_no_volta = [
+            d for d in destinations_no_volta if d not in destinations_volta
+        ]
+        destinations_cleaned = (
+            destinations_volta + destinations_no_volta + destinations_navigation1
+        )
+
+        part.add(
+            Segment(
+                id=segment_info[start_time]["ID"],
+                to=destinations_cleaned,
+                await_to=destinations_navigation2,  # await_to,
+                force_seq=segment_info[start_time]["force_full_sequence"],
+                type=segment_info[start_time]["type"],
+                info=", ".join(segment_info[start_time]["info"]),
+            ),
+            segment_info[start_time]["start"],
+            segment_info[start_time]["end"],
+        )
 
 
 def get_segments(part):
@@ -5060,7 +5059,7 @@ def get_paths(part, no_repeats=False, all_repeats=False, ignore_leap_info=True):
     segments = get_segments(part)
     paths = list()
     unfold_paths(
-        Path(["A"], segments, no_repeats=no_repeats, all_repeats=all_repeats),
+        Path([chr(65)], segments, no_repeats=no_repeats, all_repeats=all_repeats),
         paths,
         ignore_leap_info=ignore_leap_info,
     )
