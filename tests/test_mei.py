@@ -16,6 +16,7 @@ from tempfile import TemporaryDirectory
 from xmlschema.names import XML_NAMESPACE
 import os
 import numpy as np
+from partitura.score import merge_parts
 
 
 # class TestSaveMEI(unittest.TestCase):
@@ -36,7 +37,8 @@ class TestExportMEI(unittest.TestCase):
         ina = import_score.note_array()
         with TemporaryDirectory() as tmpdir:
             tmp_mei = os.path.join(tmpdir, "test.mei")
-            save_mei(import_score, tmp_mei)
+            merged_mei = merge_parts(import_score.parts, reassign="auto")
+            save_mei(merged_mei, tmp_mei)
             export_score = load_mei(tmp_mei)
             ena = export_score.note_array()
             self.assertTrue(np.all(ina["onset_beat"] == ena["onset_beat"]))
@@ -163,12 +165,12 @@ class TestImportMEI(unittest.TestCase):
         self.assertTrue(clefs2[0].start.t == 0)
         self.assertTrue(clefs2[0].sign == "C")
         self.assertTrue(clefs2[0].line == 3)
-        self.assertTrue(clefs2[0].staff == 1)
+        self.assertTrue(clefs2[0].staff == 3)
         self.assertTrue(clefs2[0].octave_change == 0)
         self.assertTrue(clefs2[1].start.t == 8)
         self.assertTrue(clefs2[1].sign == "F")
         self.assertTrue(clefs2[1].line == 4)
-        self.assertTrue(clefs2[1].staff == 1)
+        self.assertTrue(clefs2[1].staff == 3)
         self.assertTrue(clefs2[1].octave_change == 0)
         # test on part 3
         part3 = list(score.iter_parts(part_list))[3]
@@ -178,7 +180,7 @@ class TestImportMEI(unittest.TestCase):
         self.assertTrue(clefs3[1].start.t == 4)
         self.assertTrue(clefs3[1].sign == "G")
         self.assertTrue(clefs3[1].line == 2)
-        self.assertTrue(clefs3[1].staff == 1)
+        self.assertTrue(clefs3[1].staff == 4)
         self.assertTrue(clefs3[1].octave_change == -1)
 
     def test_key_signature1(self):
@@ -300,9 +302,8 @@ class TestImportMEI(unittest.TestCase):
         self.assertTrue(np.array_equal(voices, expected_voices))
 
     def test_staff(self):
-        parts = load_mei(MEI_TESTFILES[15])
-        merged_part = score.merge_parts(parts, reassign="staff")
-        staves = merged_part.note_array(include_staff=True)["staff"]
+        score = load_mei(MEI_TESTFILES[15])
+        staves = score.note_array(include_staff=True)["staff"]
         expected_staves = [4, 3, 2, 1, 1, 1]
         self.assertTrue(np.array_equal(staves, expected_staves))
 

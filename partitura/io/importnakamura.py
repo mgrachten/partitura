@@ -35,7 +35,7 @@ def load_nakamuracorresp(filename: PathLike) -> Tuple[Union[np.ndarray, list]]:
     Parameters
     ----------
     filename : str
-        The nakamura match.txt-file
+        The nakamura corresp.txt-file
 
     Returns
     -------

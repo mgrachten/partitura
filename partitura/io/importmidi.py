@@ -306,7 +306,7 @@ def load_score_midi(
     filename: Union[PathLike, mido.MidiFile],
     part_voice_assign_mode: Optional[int] = 0,
     quantization_unit: Optional[int] = None,
-    estimate_voice_info: bool = True,
+    estimate_voice_info: bool = False,
     estimate_key: bool = False,
     assign_note_ids: bool = True,
 ) -> score.Score:
@@ -363,10 +363,8 @@ def load_score_midi(
         the MIDI file.
     estimate_voice_info : bool, optional
         When True use Chew and Wu's voice separation algorithm [2]_ to
-        estimate voice information. This option is ignored for
-        part/voice assignment modes that infer voice information from
-        the track/channel info (i.e. `part_voice_assign_mode` equals
-        1, 3, 4, or 5). Defaults to True.
+        estimate voice information. If the voice information was imported
+        from the file, it will be overridden. Defaults to False.
 
     Returns
     -------

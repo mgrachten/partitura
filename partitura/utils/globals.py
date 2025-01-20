@@ -192,6 +192,37 @@ SYM_DURS = [
     {"type": "long", "dots": 3},
 ]
 
+# Straight durs do not include copies for naming or dots, when searching they work better for base triplet types in `estimate_symbolic_duration`.
+STRAIGHT_DURS = np.array(
+    [
+        4 / 256,
+        4 / 128,
+        4 / 64,
+        4 / 32,
+        4 / 16,
+        4 / 8,
+        4 / 4,
+        4 / 2,
+        4 / 1,
+        4 / 0.5,
+        4 / 0.25,
+    ]
+)
+
+SYM_STRAIGHT_DURS = [
+    {"type": "256th", "dots": 0},
+    {"type": "128th", "dots": 0},
+    {"type": "64th", "dots": 0},
+    {"type": "32nd", "dots": 0},
+    {"type": "16th", "dots": 0},
+    {"type": "eighth", "dots": 0},
+    {"type": "quarter", "dots": 0},
+    {"type": "half", "dots": 0},
+    {"type": "whole", "dots": 0},
+    {"type": "breve", "dots": 0},
+    {"type": "long", "dots": 0},
+]
+
 MAJOR_KEYS = [
     "Cb",
     "Gb",
@@ -281,14 +312,169 @@ MUSICAL_BEATS = {6: 2, 9: 3, 12: 4}
 # Standard tuning frequency of A4 in Hz
 A4 = 440.0
 
-COMPOSITE_DURS = np.array([1 + 4 / 32, 1 + 4 / 16, 2 + 4 / 32, 2 + 4 / 16, 2 + 4 / 8])
+COMPOSITE_DURS = np.array(
+    [
+        1 / 4 + 1 / 6,
+        1 / 2 + 1 / 12,
+        1 / 2 + 1 / 3,
+        1 / 2 + 1 / 4 + 1 / 6,
+        1 + 1 / 12,
+        1 + 1 / 8,
+        1 + 1 / 6,
+        1 + 1 / 4,
+        1 + 1 / 4 + 1 / 6,
+        1 + 1 / 2 + 1 / 12,
+        1 + 1 / 2 + 1 / 6,
+        1 + 1 / 2 + 1 / 3,
+        1 + 1 / 2 + 1 / 4 + 1 / 6,
+        2 + 1 / 12,
+        2 + 1 / 8,
+        2 + 1 / 6,
+        2 + 1 / 4,
+        2 + 1 / 3,
+        2 + 1 / 4 + 1 / 6,
+        2 + 1 / 2,
+        2 + 1 / 2 + 1 / 12,
+        2 + 2 / 3,
+        2 + 1 / 2 + 1 / 4,
+        2 + 1 / 2 + 1 / 3,
+        2 + 1 / 2 + 1 / 4 + 1 / 6,
+        3 + 1 / 12,
+        3 + 1 / 8,
+        3 + 1 / 6,
+        3 + 1 / 4,
+        3 + 1 / 3,
+        3 + 1 / 4 + 1 / 6,
+        3 + 1 / 2 + 1 / 12,
+        3 + 2 / 3,
+        3 + 1 / 2 + 1 / 3,
+        3 + 1 / 2 + 1 / 4 + 1 / 6,
+    ]
+)
 
 SYM_COMPOSITE_DURS = [
+    (
+        {"type": "16th", "dots": 0},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "eighth", "dots": 0},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "eighth", "dots": 0},
+        {"type": "eighth", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "eighth", "dots": 1},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "quarter", "dots": 0},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
     ({"type": "quarter", "dots": 0}, {"type": "32nd", "dots": 0}),
+    (
+        {"type": "quarter", "dots": 0},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
     ({"type": "quarter", "dots": 0}, {"type": "16th", "dots": 0}),
+    (
+        {"type": "quarter", "dots": 0},
+        {"type": "16th", "dots": 0},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "quarter", "dots": 1},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "quarter", "dots": 1},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "quarter", "dots": 1},
+        {"type": "eighth", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "quarter", "dots": 2},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
     ({"type": "half", "dots": 0}, {"type": "32nd", "dots": 0}),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
     ({"type": "half", "dots": 0}, {"type": "16th", "dots": 0}),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "eighth", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "16th", "dots": 0},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
     ({"type": "half", "dots": 0}, {"type": "eighth", "dots": 0}),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "eighth", "dots": 0},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "quarter", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    ({"type": "half", "dots": 0}, {"type": "eighth", "dots": 1}),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "eighth", "dots": 0},
+        {"type": "eighth", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 0},
+        {"type": "eighth", "dots": 1},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 1},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    ({"type": "half", "dots": 1}, {"type": "32nd", "dots": 0}),
+    (
+        {"type": "half", "dots": 1},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    ({"type": "half", "dots": 1}, {"type": "16th", "dots": 0}),
+    (
+        {"type": "half", "dots": 1},
+        {"type": "eighth", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 1},
+        {"type": "16th", "dots": 0},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 2},
+        {"type": "32nd", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 1},
+        {"type": "quarter", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 2},
+        {"type": "eighth", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
+    (
+        {"type": "half", "dots": 3},
+        {"type": "16th", "dots": 0, "actual_notes": 3, "normal_notes": 2},
+    ),
 ]
 
 
@@ -543,3 +729,15 @@ LOCAL_KEY_TRASPOSITIONS_DCML = {
         "vii": (7, "M"),
     },
 }
+
+# ["G", "F", "C", "percussion", "TAB", "jianpu", "none"]
+CLEF_TO_INT = {
+    "G": 0,
+    "F": 1,
+    "C": 2,
+    "percussion": 3,
+    "TAB": 4,
+    "jianpu": 5,
+    "none": 6,
+}
+INT_TO_CLEF = {v: k for k, v in CLEF_TO_INT.items()}

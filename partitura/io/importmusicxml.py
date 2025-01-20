@@ -8,7 +8,7 @@ import os
 import warnings
 import zipfile
 
-from typing import Union, Optional
+from typing import Union, Optional, List
 import numpy as np
 from lxml import etree
 
@@ -21,7 +21,12 @@ from partitura.directions import parse_direction
 import partitura.score as score
 from partitura.score import assign_note_ids
 from partitura.utils import ensure_notearray
-from partitura.utils.misc import deprecated_alias, deprecated_parameter, PathLike
+from partitura.utils.misc import (
+    deprecated_alias,
+    deprecated_parameter,
+    PathLike,
+    parse_ints,
+)
 
 __all__ = ["load_musicxml", "musicxml_to_notearray"]
 
@@ -1198,6 +1203,9 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
     # initialize beam to None
     beam = None
 
+    # get the stem direction of the note if any
+    stem_dir = get_value_from_tag(e, "stem", str) or None
+
     # add support of uppercase "ID" tags
     note_id = (
         get_value_from_attribute(e, "id", str)
@@ -1241,6 +1249,12 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
     else:
         ornaments = {}
 
+    technical_e = e.find("notations/technical")
+    if technical_e is not None:
+        technical_notations = get_technical_notations(technical_e)
+    else:
+        technical_notations = {}
+
     pitch = e.find("pitch")
     unpitch = e.find("unpitched")
     if pitch is not None:
@@ -1268,8 +1282,10 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
                 symbolic_duration=symbolic_duration,
                 articulations=articulations,
                 ornaments=ornaments,
+                technical=technical_notations,
                 steal_proportion=steal_proportion,
                 doc_order=doc_order,
+                stem_direction=stem_dir,
             )
             if isinstance(prev_note, score.GraceNote) and prev_note.voice == voice:
                 note.grace_prev = prev_note
@@ -1305,7 +1321,9 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
                 symbolic_duration=symbolic_duration,
                 articulations=articulations,
                 ornaments=ornaments,
+                technical=technical_notations,
                 doc_order=doc_order,
+                stem_direction=stem_dir,
             )
 
         if isinstance(prev_note, score.GraceNote) and prev_note.voice == voice:
@@ -1333,8 +1351,10 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
             notehead=notehead,
             noteheadstyle=noteheadstylebool,
             articulations=articulations,
+            technical=technical_notations,
             symbolic_duration=symbolic_duration,
             doc_order=doc_order,
+            stem_direction=stem_dir,
         )
 
     else:
@@ -1345,6 +1365,7 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
             staff=staff,
             symbolic_duration=symbolic_duration,
             articulations=articulations,
+            technical=technical_notations,
             doc_order=doc_order,
         )
 
@@ -1453,7 +1474,7 @@ def handle_tuplets(notations, ongoing, note):
     # assert that starting tuplet times are before stopping tuplet times
     for start_tuplet, stop_tuplet in zip(starting_tuplets, stopping_tuplets):
         assert (
-            start_tuplet.start_note.start.t < stop_tuplet.end_note.start.t
+            start_tuplet.start_note.start.t <= stop_tuplet.end_note.start.t
         ), "Tuplet start time is after tuplet stop time"
     return starting_tuplets, stopping_tuplets
 
@@ -1640,6 +1661,51 @@ def get_ornaments(e):
         "other-ornament",
     )
     return [a for a in ornaments if e.find(a) is not None]
+
+
+def get_technical_notations(e: etree._Element) -> List[score.NoteTechnicalNotation]:
+    # For a full list of technical notations
+    # https://usermanuals.musicxml.com/MusicXML/Content/EL-MusicXML-technical.htm
+    # for now we only support fingering
+    technical_notation_parsers = {
+        "fingering": parse_fingering,
+    }
+
+    technical_notations = [
+        parser(e.find(a))
+        for a, parser in technical_notation_parsers.items()
+        if e.find(a) is not None
+    ]
+
+    return technical_notations
+
+
+def parse_fingering(e: etree._Element) -> score.Fingering:
+
+    try:
+        # There seems to be a few cases with fingerings encoded like 4_1.
+        # This is not standard in MusicXML according to the documentation,
+        # but since it appears in files from the web, and can be displayed
+        # with MuseScore, the solution for now is just to take the fist value.
+        finger_info = parse_ints(e.text)
+    except Exception as e:
+        # Do not raise an error if fingering info cannot be parsed, insted
+        # just set it as None.
+        warnings.warn(f"Cannot parse fingering info for {e.text}!")
+        finger_info = [None]
+
+    is_alternate = e.attrib.get("alternate", False)
+    is_substitution = e.attrib.get("substitution", False)
+    placement = e.attrib.get("placement", None)
+
+    # If there is more than one finger, only take the first one
+    fingering = score.Fingering(
+        fingering=finger_info[0],
+        is_substitution=is_alternate,
+        is_alternate=is_alternate,
+        placement=placement,
+    )
+    return fingering
 
 
 @deprecated_alias(fn="filename")

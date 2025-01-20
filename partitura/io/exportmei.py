@@ -6,6 +6,7 @@ This module contains methods for exporting MEI files.
 import math
 from collections import defaultdict
 from lxml import etree
+import lxml
 import partitura.score as spt
 from operator import itemgetter
 from itertools import groupby
@@ -225,6 +226,7 @@ class MEIExporter:
         self._handle_harmony(measure_el, start=measure.start.t, end=measure.end.t)
         self._handle_fermata(measure_el, start=measure.start.t, end=measure.end.t)
         self._handle_barline(measure_el, start=measure.start.t, end=measure.end.t)
+        self._handle_fingering(measure_el, start=measure.start.t, end=measure.end.t)
         return measure_el
 
     def _handle_chord(self, chord, xml_voice_el):
@@ -277,6 +279,9 @@ class MEIExporter:
         elif note.tie_prev is not None:
             note_el.set("tie", "t")
 
+        if note.stem_direction in ["up", "down"]:
+            note_el.set("stem.dir", note.stem_direction)
+
         if note.alter is not None:
             if (
                 note.step.lower() + ALTER_TO_MEI[note.alter]
@@ -292,7 +297,7 @@ class MEIExporter:
             note_el.set("grace", "acc")
         return duration
 
-    def _handle_tuplets(self, measure_el, start, end):
+    def _handle_tuplets(self, measure_el: lxml.etree._Element, start: int, end: int):
         for tuplet in self.part.iter_all(spt.Tuplet, start=start, end=end):
             start_note = tuplet.start_note
             end_note = tuplet.end_note
@@ -349,7 +354,7 @@ class MEIExporter:
             for el in xml_el_within_tuplet:
                 tuplet_el.append(el)
 
-    def _handle_beams(self, measure_el, start, end):
+    def _handle_beams(self, measure_el: lxml.etree._Element, start: int, end: int):
         for beam in self.part.iter_all(spt.Beam, start=start, end=end):
             # If the beam has only one note, skip it
             if len(beam.notes) < 2:
@@ -397,7 +402,9 @@ class MEIExporter:
                         if note_el.getparent() != beam_el:
                             beam_el.append(note_el)
 
-    def _handle_clef_changes(self, measure_el, start, end):
+    def _handle_clef_changes(
+        self, measure_el: lxml.etree._Element, start: int, end: int
+    ):
         for clef in self.part.iter_all(spt.Clef, start=start, end=end):
             # Clef element is parent of the note element
             if clef.start.t == 0:
@@ -418,7 +425,7 @@ class MEIExporter:
                     clef_el.set("shape", str(clef.sign))
                     clef_el.set("line", str(clef.line))
 
-    def _handle_ks_changes(self, measure_el, start, end):
+    def _handle_ks_changes(self, measure_el: lxml.etree._Element, start: int, end: int):
         # For key signature changes, we add a new scoreDef element at the beginning of the measure
         # and add the key signature element as attributes of the scoreDef element
         for key_sig in self.part.iter_all(spt.KeySignature, start=start, end=end):
@@ -448,7 +455,7 @@ class MEIExporter:
             parent = measure_el.getparent()
             parent.insert(parent.index(measure_el), score_def_el)
 
-    def _handle_ts_changes(self, measure_el, start, end):
+    def _handle_ts_changes(self, measure_el: lxml.etree._Element, start: int, end: int):
         # For key signature changes, we add a new scoreDef element at the beginning of the measure
         # and add the key signature element as attributes of the scoreDef element
         for time_sig in self.part.iter_all(spt.TimeSignature, start=start, end=end):
@@ -464,7 +471,7 @@ class MEIExporter:
             score_def_el.set("count", str(time_sig.beats))
             score_def_el.set("unit", str(time_sig.beat_type))
 
-    def _handle_harmony(self, measure_el, start, end):
+    def _handle_harmony(self, measure_el: lxml.etree._Element, start: int, end: int):
         """
         For harmonies we add a new harm element at the beginning of the measure.
         The position doesn't really matter since the tstamp attribute will place it correctly
@@ -505,7 +512,7 @@ class MEIExporter:
                 # text is a child element of harmony but not a xml element
                 harm_el.text = "|" + harmony.text
 
-    def _handle_fermata(self, measure_el, start, end):
+    def _handle_fermata(self, measure_el: lxml.etree._Element, start: int, end: int):
         for fermata in self.part.iter_all(spt.Fermata, start=start, end=end):
             if fermata.ref is not None:
                 note = fermata.ref
@@ -524,7 +531,7 @@ class MEIExporter:
                 # Set the fermata to be above the staff (the highest staff)
                 fermata_el.set("staff", "1")
 
-    def _handle_barline(self, measure_el, start, end):
+    def _handle_barline(self, measure_el: lxml.etree._Element, start: int, end: int):
         for end_barline in self.part.iter_all(
             spt.Ending, start=end, end=end + 1, mode="ending"
         ):
@@ -542,6 +549,26 @@ class MEIExporter:
             spt.Repeat, start=start, end=start + 1, mode="starting"
         ):
             measure_el.set("left", "rptstart")
+
+    def _handle_fingering(self, measure_el: lxml.etree._Element, start: int, end: int):
+        """
+        For fingering we add a new fing element at the end of the measure.
+        The position doesn't really matter since the startid attribute will place it correctly
+        """
+        for note in self.part.iter_all(spt.Note, start=start, end=end):
+            if note.technical is not None:
+                for technical_notation in note.technical:
+                    if (
+                        isinstance(technical_notation, score.Fingering)
+                        and note.id is not None
+                    ):
+                        fing_el = etree.SubElement(measure_el, "fing")
+                        fing_el.set(XMLNS_ID, "fing-" + self.elc_id())
+                        fing_el.set("startid", note.id)
+                        # Naive way to place the fingering notation
+                        fing_el.set("place", ("above" if note.staff == 1 else "below"))
+                        # text is a child element of fingering but not a xml element
+                        fing_el.text = technical_notation.fingering
 
 
 @deprecated_alias(parts="score_data")

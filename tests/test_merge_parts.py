@@ -8,7 +8,7 @@ import logging
 import unittest
 from pathlib import Path
 
-from partitura import load_musicxml
+from partitura import load_musicxml, load_mei
 from partitura.score import merge_parts, Part, iter_parts
 from partitura.utils.music import ensure_notearray
 
@@ -100,3 +100,12 @@ class TestMergeParts(unittest.TestCase):
         expected_staves = [4, 3, 2, 1, 1, 1]
         self.assertTrue(note_array["voice"].tolist() == expected_voices)
         self.assertTrue(note_array["staff"].tolist() == expected_staves)
+
+    def test_reassign_auto(self):
+        score = load_mei(MERGE_PARTS_TESTFILES[8])
+        merged_part = merge_parts(score.parts, reassign="auto")
+        note_array = merged_part.note_array(include_staff=True)
+        expected_voices = [13, 9, 5, 2, 1, 1]
+        expected_staves = [4, 3, 2, 1, 1, 1 ]
+        self.assertEqual(note_array["voice"].tolist(),expected_voices)
+        self.assertEqual(note_array["staff"].tolist(),expected_staves)

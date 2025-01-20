@@ -136,7 +136,7 @@ def make_triplets_example_2():
     fill_track(track, notes, divs)
     # target:
     actual_notes = [5] * 5 + [3] * 3
-    normal_notes = [2] * 5 + [2] * 3
+    normal_notes = [4] * 5 + [2] * 3
     return mid, actual_notes, normal_notes
 
 

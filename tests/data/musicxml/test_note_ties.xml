@@ -27,6 +27,7 @@
         <duration>15</duration>
         <tie type="start"/>
         <voice>1</voice>
+        <stem>up</stem>
         <type>quarter</type>
         <dot/>
         <notations>
