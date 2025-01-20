@@ -45,6 +45,10 @@ MUSICXML_UNFOLD_TESTPAIRS = [
         )
     ]
 ]
+MUSICXML_TUPLET_ATTRIBUTES_TESTFILES = [
+    os.path.join(MUSICXML_PATH, fn)
+    for fn in ["test_tuplet_attributes.musicxml"]
+]
 
 MUSICXML_UNFOLD_COMPLEX = [
     (

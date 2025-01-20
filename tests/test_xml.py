@@ -11,6 +11,7 @@ from tempfile import TemporaryFile
 from tests import (
     MUSICXML_IMPORT_EXPORT_TESTFILES,
     MUSICXML_SCORE_OBJECT_TESTFILES,
+    MUSICXML_TUPLET_ATTRIBUTES_TESTFILES,
     MUSICXML_UNFOLD_TESTPAIRS,
     MUSICXML_UNFOLD_COMPLEX,
     MUSICXML_UNFOLD_VOLTA,
@@ -216,6 +217,21 @@ class TestMusicXML(unittest.TestCase):
         # test if stem direction is imported correctly for the first note of test_note_ties.xml
         part = load_musicxml(MUSICXML_IMPORT_EXPORT_TESTFILES[0])[0]
         self.assertEqual(part.notes_tied[0].stem_direction, "up")
+
+    def test_tuplet_attributes(self):
+        part = load_musicxml(MUSICXML_TUPLET_ATTRIBUTES_TESTFILES[0])[0]
+        tuplets = list(part.iter_all(cls=score.Tuplet))
+        real_values = [
+            (3, 2, "eighth"),
+            (5, 4, "eighth"),
+            (3, 2, "16th"),
+            (2, 3, "eighth"),
+            (5, 3, "eighth"),
+        ]
+        for tuplet, (actual, normal, note_type) in zip(tuplets, real_values):
+            self.assertEqual(tuplet.actual_notes, actual)
+            self.assertEqual(tuplet.normal_notes, normal)
+            self.assertEqual(tuplet.type, note_type)
 
     def _pretty_export_import_pretty_test(self, part1):
         # pretty print the part

@@ -11,6 +11,7 @@ are registered in terms of their start and end times.
 from copy import copy, deepcopy
 from collections import defaultdict
 from collections.abc import Iterable
+from fractions import Fraction
 from numbers import Number
 from partitura.utils.globals import (
     MUSICAL_BEATS,
@@ -2401,12 +2402,15 @@ class Tuplet(TimedObject):
 
     """
 
-    def __init__(self, start_note=None, end_note=None):
+    def __init__(self, start_note=None, end_note=None, actual_notes=None, normal_notes=None, type=None):
         super().__init__()
         self._start_note = None
         self._end_note = None
         self.start_note = start_note
         self.end_note = end_note
+        self.actual_notes = actual_notes
+        self.normal_notes = normal_notes
+        self.type = type
         # maintain a list of attributes to update when cloning this instance
         self._ref_attrs.extend(["start_note", "end_note"])
 
@@ -2444,10 +2448,24 @@ class Tuplet(TimedObject):
             note.tuplet_stops.append(self)
         self._end_note = note
 
+    @property
+    def duration_multiplier(self) -> Fraction:
+        """Ratio by which the durations are scaled with this tuplet, as a python Fraction object.
+        This property is similar to `.tupletMultiplier` in music21:
+        https://www.music21.org/music21docs/moduleReference/moduleDuration.html#music21.duration.Tuplet.tupletMultiplier
+
+        For example, in a triplet of eighth notes, each eighth note would have a duration of
+        duration_multiplier * normal_eighth_duration = 2/3 * normal_eighth_duration
+        """
+        return Fraction(self.normal_notes, self.actual_notes)
+
     def __str__(self):
+        n_actual = "" if self.actual_notes is None else "actual_notes={}".format(self.actual_notes)
+        n_normal = "" if self.normal_notes is None else "normal_notes={}".format(self.normal_notes)
+        type_ = "" if self.type is None else "type={}".format(self.type)
         start = "" if self.start_note is None else "start={}".format(self.start_note.id)
         end = "" if self.end_note is None else "end={}".format(self.end_note.id)
-        return " ".join((super().__str__(), start, end)).strip()
+        return " ".join((super().__str__(), start, end, n_actual, n_normal, type_)).strip()
 
 
 class Repeat(TimedObject):
