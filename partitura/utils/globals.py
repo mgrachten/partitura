@@ -258,7 +258,7 @@ MINOR_KEYS = [
     "A#",
 ]
 
-TIME_UNITS = ["beat", "quarter", "sec", "div"]
+TIME_UNITS = ["beat", "quarter", "sec", "div", "tick"]
 
 NOTE_NAME_PATT = re.compile(r"([A-G]{1})([xb\#]*)(\d+)")
 
