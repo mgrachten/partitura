@@ -77,6 +77,11 @@ MUSICXML_UNFOLD_DACAPO = [
     for fn1, fn2 in [("test_unfold_dacapo.xml", "test_unfold_dacapo_result.xml")]
 ]
 
+MUSICXML_IGNORE_INVISIBLE_OBJECTS = [
+    os.path.join(MUSICXML_PATH, fn)
+    for fn in ["test_ignore_invisible_objects.musicxml"]
+]
+
 # This is a list of files for testing Chew and Wu's VOSA. (More files to come?)
 VOSA_TESTFILES = [
     os.path.join(MUSICXML_PATH, fn) for fn in ["test_chew_vosa_example.xml"]

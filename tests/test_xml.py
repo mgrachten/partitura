@@ -15,6 +15,7 @@ from tests import (
     MUSICXML_UNFOLD_COMPLEX,
     MUSICXML_UNFOLD_VOLTA,
     MUSICXML_UNFOLD_DACAPO,
+    MUSICXML_IGNORE_INVISIBLE_OBJECTS,
 )
 
 from partitura import load_musicxml, save_musicxml
@@ -255,6 +256,32 @@ class TestMusicXML(unittest.TestCase):
 
         self.assertTrue(score.work_title == test_work_title)
         self.assertTrue(score.work_number == test_work_number)
+
+    def test_import_ignore_invisible_objects(self):
+        score_w_invisible = load_musicxml(MUSICXML_IGNORE_INVISIBLE_OBJECTS[0])[0]
+        score_wo_invisible = load_musicxml(MUSICXML_IGNORE_INVISIBLE_OBJECTS[0], ignore_invisible_objects=True)[0]
+
+        note_w_invisible_objs = score_w_invisible.note_array()
+        note_wo_invisible_objs = score_wo_invisible.note_array()
+
+        # Convert back from structured array to simple tuples as hash problems with set otherwise
+        note_w_invisible_objs = set(
+            [(n["pitch"], n["onset_beat"], n["duration_beat"]) for n in note_w_invisible_objs]
+        )
+        note_wo_invisible_objs = set(
+            [(n["pitch"], n["onset_beat"], n["duration_beat"]) for n in note_wo_invisible_objs]
+        )
+        # Make sure all notes in the filtered score are also in the unfiltered score
+        self.assertTrue(note_wo_invisible_objs.issubset(note_w_invisible_objs))
+
+        self.assertTrue(len(note_w_invisible_objs) == 11)
+        self.assertTrue(len(note_wo_invisible_objs) == 6)
+
+        self.assertTrue(len(score_w_invisible.rests) == 1)
+        self.assertTrue(len(score_wo_invisible.rests) == 0)
+
+        self.assertTrue(len(list(score_w_invisible.iter_all(cls=score.Beam))) == 1)
+        self.assertTrue(len(list(score_wo_invisible.iter_all(cls=score.Beam))) == 0)
 
 
 def make_part_slur():
