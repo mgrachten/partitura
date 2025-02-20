@@ -327,7 +327,7 @@ def save_kern(
     out_data = exporter.parse()
     out_data = exporter.trim(out_data)
     # Use numpy savetxt to save the file
-    footer = "Encoded using the Partitura Python package, version 1.5.0"
+    footer = "Encoded using the Partitura Python package, version 1.6.0"
     if out is not None:
         np.savetxt(
             fname=out,

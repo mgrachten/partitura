@@ -21,7 +21,6 @@ from partitura.performance import Performance, PerformedPart, PerformanceLike
 from partitura.io.matchlines_v1 import (
     make_info,
     make_scoreprop,
-    make_section,
     MatchSnote,
     MatchNote,
     MatchSnoteNote,
@@ -313,6 +312,7 @@ def matchfile_from_alignment(
             staff = getattr(snote, "staff", None)
             ornaments = getattr(snote, "ornaments", None)
             fermata = getattr(snote, "fermata", None)
+            technical = getattr(snote, "technical", None)
 
             if voice is not None:
                 score_attributes_list.append(f"v{voice}")
@@ -328,6 +328,11 @@ def matchfile_from_alignment(
 
             if fermata is not None:
                 score_attributes_list.append("fermata")
+
+            if technical is not None:
+                for tech_el in technical:
+                    if isinstance(tech_el, score.Fingering):
+                        score_attributes_list.append(f"fingering{tech_el.fingering}")
 
             if isinstance(snote, score.GraceNote):
                 score_attributes_list.append("grace")
@@ -417,7 +422,7 @@ def matchfile_from_alignment(
         duplicates[tuple(v)] = idx
     voice_overlap_note_ids = []
     if len(duplicates) > 0:
-        duplicate_idx = np.concatenate(np.array(list(duplicates.values()))).flatten()
+        duplicate_idx = np.hstack(list(duplicates.values()))
         voice_overlap_note_ids = list(sna[duplicate_idx]["id"])
 
     for al_note in alignment:

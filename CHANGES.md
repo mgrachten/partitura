@@ -1,6 +1,52 @@
 Release Notes
 =============
 
+Version 1.6.0 (Released on 2025-02-27)
+--------------------------------------
+
+This new version addresses multiple changes, bug fixes and new features:
+
+### New features
+- Measure refactor for musicxml, match, midi, note array to part in #376
+- Measure feature #377
+- Clef feature #382
+- Clef map #384 #396
+- Stem direction #392 
+- Support for cross staff voices in mei #397
+- Improved parsing of Kern scores #413 
+- Fixed import for performance pedal #399 
+- Tick Units are now supported for pianoroll creation #412 
+- Scores can be loaded directly for URL #404 
+- Support for invisible objects in musicxml import #401 
+- Support for Fingering annotations in MusicXML and MEI import/export #403 
+
+### Bug fixes
+- Corrected `get_time_maps_from_alignment` #360
+- Corrected metrical strength features #364
+- Corrected offsets for tied notes #366
+- Fixed import issue #368
+- Fixed Kern parsing #370
+- Duration of Chord Notes #418 
+- Corrected symbolic note duration #372
+- Fixed tuplet bug #387
+- Addressed sorting for enharmonic notes #407 
+-  Fixes eq bug on performed notes #422
+- Fixed timing-tempo change bug #427 
+
+### Other Changes
+- Added check for empty note array #361
+- Improved documentation #362 #364
+- Removed default voice estimation #373
+- Added warning #379 
+- Removed ordering in musicxml export #391
+- Improved Fingering parsing in MusicXML that could result to errors #416
+- Replaced Deprecated Scipy Function #417 
+- Improved support for input and export in musicxml tuplet object
+- New option to force add new segments #410 
+
+
+
+
 Version 1.5.0 (Released on 2024-07-17)
 --------------------------------------
 

@@ -8,8 +8,9 @@ import os
 import warnings
 from urllib.request import urlopen
 from shutil import copyfileobj
+import re
 
-from typing import Union, Callable, Dict, Any, Iterable, Optional
+from typing import Union, Callable, Dict, Any, Iterable, Optional, List
 
 import numpy as np
 
@@ -280,3 +281,23 @@ def download_file(
     """
     with urlopen(url) as in_stream, open(out, "wb") as out_file:
         copyfileobj(in_stream, out_file)
+
+
+def parse_ints(input_string: str) -> List[int]:
+    """
+    Parse all numbers from a given string where numbers are separated by spaces or tabs.
+
+    Parameters
+    ----------
+    input_string : str
+        The input string containing numbers separated by spaces or tabs.
+
+    Returns
+    -------
+    List[int]
+        A list of integers extracted from the input string.
+    """
+    # Regular expression to match numbers
+    pattern = r"\d+"
+    # Find all matches and convert them to integers
+    return list(map(int, re.findall(pattern, input_string)))

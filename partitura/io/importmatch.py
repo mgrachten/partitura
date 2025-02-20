@@ -12,41 +12,16 @@ import numpy as np
 from partitura import score
 from partitura.score import Part, Score
 from partitura.performance import PerformedPart, Performance
-from partitura.musicanalysis import estimate_voices, estimate_key
 
 from partitura.io.matchlines_v0 import (
     FROM_MATCHLINE_METHODS as FROM_MATCHLINE_METHODSV0,
-    parse_matchline as parse_matchlinev0,
     MatchInfo as MatchInfoV0,
-    MatchMeta as MatchMetaV0,
-    MatchSnote as MatchSnoteV0,
-    MatchNote as MatchNoteV0,
-    MatchSnoteNote as MatchSnoteNoteV0,
-    MatchSnoteDeletion as MatchSnoteDeletionV0,
-    MatchSnoteTrailingScore as MatchSnoteTrailingScoreV0,
-    MatchInsertionNote as MatchInsertionNoteV0,
-    MatchHammerBounceNote as MatchHammerBounceNoteV0,
-    MatchTrailingPlayedNote as MatchTrailingPlayedNoteV0,
-    MatchSustainPedal as MatchSustainPedalV0,
-    MatchSoftPedal as MatchSoftPedalV0,
     MatchTrillNote as MatchTrillNoteV0,
 )
 
 from partitura.io.matchlines_v1 import (
     FROM_MATCHLINE_METHODS as FROM_MATCHLINE_METHODSV1,
     MatchInfo as MatchInfoV1,
-    MatchScoreProp as MatchScorePropV1,
-    MatchSection as MatchSectionV1,
-    MatchStime as MatchStimeV1,
-    MatchPtime as MatchPtimeV1,
-    MatchStimePtime as MatchStimePtimeV1,
-    MatchSnote as MatchSnoteV1,
-    MatchNote as MatchNoteV1,
-    MatchSnoteNote as MatchSnoteNoteV1,
-    MatchSnoteDeletion as MatchSnoteDeletionV1,
-    MatchInsertionNote as MatchInsertionNoteV1,
-    MatchSustainPedal as MatchSustainPedalV1,
-    MatchSoftPedal as MatchSoftPedalV1,
     MatchOrnamentNote as MatchOrnamentNoteV1,
 )
 
@@ -56,41 +31,26 @@ from partitura.io.matchfile_base import (
     MatchLine,
     BaseSnoteLine,
     BaseSnoteNoteLine,
-    BaseStimePtimeLine,
     BaseDeletionLine,
     BaseInsertionLine,
     BaseOrnamentLine,
-    BaseSustainPedalLine,
-    BaseSoftPedalLine,
 )
 
 from partitura.io.matchfile_utils import (
     Version,
     number_pattern,
     vnumber_pattern,
+    fingering_pattern,
     MatchTimeSignature,
-    MatchKeySignature,
     format_pnote_id,
 )
 
-from partitura.utils.music import (
-    midi_ticks_to_seconds,
-    pitch_spelling_to_midi_pitch,
-    ensure_pitch_spelling_format,
-    key_name_to_fifths_mode,
-    estimate_clef_properties,
-    note_array_from_note_list,
-)
+from partitura.utils.music import midi_ticks_to_seconds
 
 
-from partitura.utils.misc import (
-    deprecated_alias,
-    deprecated_parameter,
-    PathLike,
-    get_document_name,
-)
+from partitura.utils.misc import deprecated_alias, PathLike, get_document_name
 
-from partitura.utils.generic import interp1d, partition, iter_current_next
+from partitura.utils.generic import interp1d, iter_current_next
 
 __all__ = ["load_match"]
 
@@ -244,6 +204,12 @@ def load_match(
     first_note_at_zero : bool, optional
         When True the note_on and note_off times in the performance
         are shifted to make the first note_on time equal zero.
+        Defaults to False.
+    offset_duration_whole: Boolean, optional
+        A flag for the type of offset and duration given in the matchfile.
+        When true, the function expects the values to be given in whole
+        notes (e.g. 1/4 for a quarter note) independet of time signature.
+        Defaults to True.
 
     Returns
     -------
@@ -490,9 +456,14 @@ def part_from_matchfile(
     ts = mf.time_signatures
     min_time = snotes[0].OnsetInBeats  # sorted by OnsetInBeats
     max_time = max(n.OffsetInBeats for n in snotes)
-    _, beats_map, _, beat_type_map, min_time_q, max_time_q = make_timesig_maps(
-        ts, max_time
-    )
+    (
+        beats_map_from_beats,
+        beats_map,
+        beat_type_map_from_beats,
+        beat_type_map,
+        min_time_q,
+        max_time_q,
+    ) = make_timesig_maps(ts, max_time)
 
     # compute necessary divs based on the types of notes in the
     # match snotes (only integers)
@@ -511,7 +482,6 @@ def part_from_matchfile(
 
     onset_in_beats = np.array([note.OnsetInBeats for note in snotes])
     unique_onsets, inv_idxs = np.unique(onset_in_beats, return_inverse=True)
-    # unique_onset_idxs = [np.where(onset_in_beats == u) for u in unique_onsets]
 
     iois_in_beats = np.diff(unique_onsets)
     beat_to_quarter = 4 / beat_type_map(onset_in_beats)
@@ -528,10 +498,6 @@ def part_from_matchfile(
     onset_in_divs = np.r_[0, np.cumsum(divs * iois_in_quarters)][inv_idxs]
     onset_in_quarters = onset_in_quarters[inv_idxs]
 
-    # duration_in_beats = np.array([note.DurationInBeats for note in snotes])
-    # duration_in_quarters = duration_in_beats * beat_to_quarter
-    # duration_in_divs = duration_in_quarters * divs
-
     part.set_quarter_duration(0, divs)
     bars = np.unique([n.Measure for n in snotes])
     t = min_time
@@ -542,8 +508,6 @@ def part_from_matchfile(
     if t > 0:
         # if we have an incomplete first measure that isn't an anacrusis
         # measure, add a rest (dummy)
-        # t = t-t%beats_map(min_time)
-
         # if starting beat is above zero, add padding
         rest = score.Rest()
         part.add(rest, start=0, end=t * divs)
@@ -551,16 +515,34 @@ def part_from_matchfile(
         offset = 0
         t = t - t % beats_map(min_time)
 
-    for b0, b1 in iter_current_next(bars, end=bars[-1] + 1):
-        bar_times.setdefault(b0, t)
-        if t < 0:
-            t = 0
+    for b_name in bars:
+        notes_in_this_bar = [
+            (ni, n) for ni, n in enumerate(snotes) if n.Measure == b_name
+        ]
+        a_note_in_this_bar = notes_in_this_bar[0][1]
+        a_note_id_in_this_bar = notes_in_this_bar[0][0]
+        bar_offset = (
+            (a_note_in_this_bar.Beat - 1)
+            * 4
+            / beat_type_map_from_beats(a_note_in_this_bar.OnsetInBeats)
+        )
+        on_off_scale = 1
+        if not match_offset_duration_in_whole:
+            on_off_scale = beat_type_map_from_beats(a_note_in_this_bar.OnsetInBeats)
+        beat_offset = (
+            4
+            / on_off_scale
+            * a_note_in_this_bar.Offset.numerator
+            / (
+                a_note_in_this_bar.Offset.denominator
+                * (a_note_in_this_bar.Offset.tuple_div or 1)
+            )
+        )
 
-        else:
-            # multiply by diff between consecutive bar numbers
-            n_bars = b1 - b0
-            if t <= max_time_q:
-                t += (n_bars * 4 * beats_map(t)) / beat_type_map(t)
+        barline_in_quarters = (
+            onset_in_quarters[a_note_id_in_this_bar] - bar_offset - beat_offset
+        )
+        bar_times[b_name] = barline_in_quarters
 
     for ni, note in enumerate(snotes):
         # start of bar in quarter units
@@ -584,15 +566,6 @@ def part_from_matchfile(
             * note.Offset.numerator
             / (note.Offset.denominator * (note.Offset.tuple_div or 1))
         )
-
-        # check anacrusis measure beat counting type for the first note
-        if bar_start < 0 and (bar_offset != 0 or beat_offset != 0) and ni == 0:
-            # in case of fully counted anacrusis we set the bar_start
-            # to -bar_duration (in quarters) so that the below calculation is correct
-            # not active for shortened anacrusis measures
-            bar_start = -beats_map(bar_start) * 4 / beat_type_map(bar_start)
-            # reset the bar_start for other notes in the anacrusis measure
-            bar_times[note.Bar] = bar_start
 
         # convert the onset time in quarters (0 at first barline) to onset
         # time in divs (0 at first note)
@@ -622,6 +595,7 @@ def part_from_matchfile(
             alter=note.Modifier,
             id=note.Anchor,
             articulations=articulations,
+            technical=[],
         )
 
         staff_nr = next(
@@ -648,6 +622,18 @@ def part_from_matchfile(
             note_attributes["voice"] = next(
                 (int(a) for a in note.ScoreAttributesList if number_pattern.match(a)),
                 None,
+            )
+
+        if any(a.startswith("fingering") for a in note.ScoreAttributesList):
+            note_attributes["technical"].append(
+                next(
+                    (
+                        score.Fingering(int(a[9:]))
+                        for a in note.ScoreAttributesList
+                        if fingering_pattern.match(a)
+                    ),
+                    None,
+                )
             )
 
         # get rid of this if as soon as we have a way to iterate over the
@@ -754,9 +740,25 @@ def part_from_matchfile(
     add_staffs(part)
     # add_clefs(part)
 
-    # add incomplete measure if necessary
-    if offset < 0:
-        part.add(score.Measure(number=0), 0, int(-offset * divs))
+    prev_measure = None
+    for measure_counter, measure_name in enumerate(bar_times.keys()):
+        barline_in_quarters = bar_times[measure_name]
+        barline_in_divs = int(round(divs * (barline_in_quarters - offset)))
+        if barline_in_divs < 0:
+            barline_in_divs = 0
+        if prev_measure is not None:
+            part.add(prev_measure, None, barline_in_divs)
+        prev_measure = score.Measure(number=measure_counter + 1, name=str(measure_name))
+        part.add(prev_measure, barline_in_divs)
+    last_closing_barline = barline_in_divs + int(
+        round(
+            divs
+            * beats_map(barline_in_quarters)
+            * 4
+            / beat_type_map(barline_in_quarters)
+        )
+    )
+    part.add(prev_measure, None, last_closing_barline)
 
     # add the rest of the measures automatically
     score.add_measures(part)
@@ -780,7 +782,7 @@ def part_from_matchfile(
 def make_timesig_maps(
     ts_orig: List[Tuple[float, int, MatchTimeSignature]],
     max_time: float,
-) -> (Callable, Callable, Callable, Callable, float, float):
+) -> Tuple[Callable, Callable, Callable, Callable, float, float]:
     """
     Create time signature (interpolation) maps
 
@@ -850,17 +852,17 @@ def make_timesig_maps(
 
 def add_staffs(part: Part, split: int = 55, only_missing: bool = True) -> None:
     """
-        Method to add staff information to a part
+    Method to add staff information to a part
 
-        Parameters
-        ----------
-        part: Part
-            Part to add staff information to.
-        split: int
-            MIDI pitch to split staff into upper and lower. Default is 55
-        only_missing: bool
-            If True, only add staff to those notes that do not have staff info already.
-    x"""
+    Parameters
+    ----------
+    part: Part
+        Part to add staff information to.
+    split: int
+        MIDI pitch to split staff into upper and lower. Default is 55
+    only_missing: bool
+        If True, only add staff to those notes that do not have staff info already.
+    """
     # assign staffs using a hard limit
     notes = part.notes_tied
     for n in notes:

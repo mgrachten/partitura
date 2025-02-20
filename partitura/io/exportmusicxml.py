@@ -137,6 +137,10 @@ def make_note_el(note, dur, voice, counter, n_of_staves):
     if voice not in (None, 0):
         etree.SubElement(note_e, "voice").text = "{}".format(voice)
 
+    if note.stem_direction is not None:
+        stem_e = etree.SubElement(note_e, "stem")
+        stem_e.text = note.stem_direction
+
     if note.fermata is not None:
         notations.append(etree.Element("fermata"))
 
@@ -149,6 +153,19 @@ def make_note_el(note, dur, voice, counter, n_of_staves):
             articulations_e = etree.Element("articulations")
             articulations_e.extend(articulations)
             notations.append(articulations_e)
+
+    if note.technical:
+        technical = []
+        for technical_notation in note.technical:
+            if isinstance(technical_notation, score.Fingering):
+                tech_el = etree.Element("fingering")
+                tech_el.text = str(technical_notation.fingering)
+                technical.append(tech_el)
+
+        if technical:
+            technical_e = etree.Element("technical")
+            technical_e.extend(technical)
+            notations.append(technical_e)
 
     sym_dur = note.symbolic_duration or {}
 
@@ -210,9 +227,26 @@ def make_note_el(note, dur, voice, counter, n_of_staves):
         else:
             del counter[tuplet_key]
 
-        notations.append(
-            etree.Element("tuplet", number="{}".format(number), type="start")
-        )
+        tuplet_e = etree.Element("tuplet", number="{}".format(number), type="start")
+        if (
+            tuplet.actual_notes is not None
+            and tuplet.normal_notes is not None
+            and tuplet.actual_type is not None
+            and tuplet.normal_type is not None
+        ):
+            # tuplet-actual tag
+            tuplet_actual_e = etree.SubElement(tuplet_e, "tuplet-actual")
+            tuplet_actual_notes_e = etree.SubElement(tuplet_actual_e, "tuplet-number")
+            tuplet_actual_notes_e.text = str(tuplet.actual_notes)
+            tuplet_actual_type_e = etree.SubElement(tuplet_actual_e, "tuplet-type")
+            tuplet_actual_type_e.text = str(tuplet.actual_type)
+            # tuplet-normal tag
+            tuplet_normal_e = etree.SubElement(tuplet_e, "tuplet-normal")
+            tuplet_normal_notes_e = etree.SubElement(tuplet_normal_e, "tuplet-number")
+            tuplet_normal_notes_e.text = str(tuplet.normal_notes)
+            tuplet_normal_type_e = etree.SubElement(tuplet_normal_e, "tuplet-type")
+            tuplet_normal_type_e.text = str(tuplet.normal_type)
+        notations.append(tuplet_e)
 
     if notations:
         notations_e = etree.SubElement(note_e, "notations")
@@ -413,9 +447,12 @@ def linearize_segment_contents(part, start, end, state):
 
     for voice in sorted(notes_by_voice.keys()):
         voice_notes = notes_by_voice[voice]
-        # sort by pitch
+        # sort by pitch (then step in case of enharmonic notes)
         voice_notes.sort(
-            key=lambda n: n.midi_pitch if hasattr(n, "midi_pitch") else -1, reverse=True
+            key=lambda n: (
+                (n.midi_pitch, n.step) if hasattr(n, "midi_pitch") else (-1, "")
+            ),
+            reverse=True,
         )
         # grace notes should precede other notes at the same onset
         voice_notes.sort(key=lambda n: not isinstance(n, score.GraceNote))
@@ -634,12 +671,20 @@ def merge_measure_contents(notes, other, measure_start):
         merged[0] = []
         cost[0] = 0
 
+    # CHANGE: disabled cost-based merging of non-note elements into stream
+    # because this led to attributes not being in the beginning of the measure,
+    # which in turn led to problems with musescore
+    # fix: add atributes first, then the notes.
+    # problem: unclear whether this cost-based merging will break anything or
+    # was just cosmetic to avoid too many forwards and backwards.
+    # related issue: https://github.com/CPJKU/partitura/issues/390
+
     # get the voice for which merging notes and other has lowest cost
-    merge_voice = sorted(cost.items(), key=itemgetter(1))[0][0]
+    # merge_voice = sorted(cost.items(), key=itemgetter(1))[0][0]
     result = []
     pos = measure_start
     for i, voice in enumerate(sorted(notes.keys())):
-        if voice == merge_voice:
+        if i == 0:  # voice == merge_voice:
             elements = merged[voice]
 
         else:
@@ -658,7 +703,7 @@ def merge_measure_contents(notes, other, measure_start):
             elif gap > 0:
                 e = etree.Element("forward")
                 ee = etree.SubElement(e, "duration")
-                ee.text = "{:d}".format(gap)
+                ee.text = "{:d}".format(int(gap))
                 result.append(e)
 
         result.extend([e for _, _, e in elements])
@@ -1053,8 +1098,8 @@ def save_musicxml(
             part_e.append(etree.Comment(MEASURE_SEP_COMMENT))
             attrib = {}
 
-            if measure.number is not None:
-                attrib["number"] = str(measure.number)
+            if measure.name is not None:
+                attrib["number"] = str(measure.name)
 
             measure_e = etree.SubElement(part_e, "measure", **attrib)
             contents = linearize_measure_contents(

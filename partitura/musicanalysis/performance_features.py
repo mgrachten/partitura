@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 This module implement a series of mid-level descriptors of the performance expressions.
-Built upon the low-level basis functions from the performance codec. 
+Built upon the low-level basis functions from the performance codec.
 """
 
 import sys

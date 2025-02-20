@@ -8,7 +8,7 @@ import os
 import warnings
 import zipfile
 
-from typing import Union, Optional
+from typing import Union, Optional, List
 import numpy as np
 from lxml import etree
 
@@ -21,7 +21,12 @@ from partitura.directions import parse_direction
 import partitura.score as score
 from partitura.score import assign_note_ids
 from partitura.utils import ensure_notearray
-from partitura.utils.misc import deprecated_alias, deprecated_parameter, PathLike
+from partitura.utils.misc import (
+    deprecated_alias,
+    deprecated_parameter,
+    PathLike,
+    parse_ints,
+)
 
 __all__ = ["load_musicxml", "musicxml_to_notearray"]
 
@@ -190,6 +195,7 @@ def load_musicxml(
     filename: PathLike,
     validate: bool = False,
     force_note_ids: Optional[Union[bool, str]] = None,
+    ignore_invisible_objects: bool = False,
 ) -> score.Score:
     """Parse a MusicXML file and build a composite score ontology
     structure from it (see also scoreontology.py).
@@ -208,6 +214,9 @@ def load_musicxml(
         assigned unique id attribute. Existing note id attributes in
         the MusicXML will be discarded. If 'keep', only notes without
         a note id will be assigned one.
+    ignore_invisible_objects : bool, optional
+        When True, objects that with the attribute `print-object="no"`
+        will be ignored. Defaults to False.
 
     Returns
     -------
@@ -215,6 +224,13 @@ def load_musicxml(
         A `Score` instance.
 
     """
+    # NOTE: raising warning for ignore_invisible_objects is not ideal and it should be changed in the future
+    if ignore_invisible_objects:
+        warnings.warn(
+            "Be advised that the 'ignore_invisible_objects' option might sometimes lead "
+            "to parsing errors for unusual musicxml files. \n"
+            "Note that when ignore_invisible_objects is False (the default), the parsing works as expected as before."
+        )
 
     xml = None
     if isinstance(filename, str):
@@ -252,7 +268,9 @@ def load_musicxml(
         partlist, part_dict = _parse_partlist(partlist_el)
         # Go through each <part> to obtain the content of the parts.
         # The Part instances will be modified in place
-        _parse_parts(document, part_dict)
+        _parse_parts(
+            document, part_dict, ignore_invisible_objects=ignore_invisible_objects
+        )
     else:
         partlist = []
 
@@ -341,7 +359,7 @@ def load_musicxml(
     return scr
 
 
-def _parse_parts(document, part_dict):
+def _parse_parts(document, part_dict, ignore_invisible_objects=False):
     """
     Populate the Part instances that are the values of `part_dict` with the
     musical content in document.
@@ -353,6 +371,8 @@ def _parse_parts(document, part_dict):
     part_dict : dict
         A dictionary with key--value pairs (part_id, Part instance), as returned
         by the _parse_partlist() function.
+    ignore_invisible_objects : bool, optional
+        When True, objects that with the attribute `print-object="no"` will be ignored.
     """
 
     for part_el in document.findall("part"):
@@ -368,7 +388,13 @@ def _parse_parts(document, part_dict):
 
         for mc, measure_el in enumerate(part_el.xpath("measure")):
             position, doc_order = _handle_measure(
-                measure_el, position, part, ongoing, doc_order, mc + 1
+                measure_el,
+                position,
+                part,
+                ongoing,
+                doc_order,
+                mc + 1,
+                ignore_invisible_objects,
             )
 
         # complete unfinished endings
@@ -492,7 +518,15 @@ def _parse_parts(document, part_dict):
         #     shift.applied = True
 
 
-def _handle_measure(measure_el, position, part, ongoing, doc_order, measure_counter):
+def _handle_measure(
+    measure_el,
+    position,
+    part,
+    ongoing,
+    doc_order,
+    measure_counter,
+    ignore_invisible_objects=False,
+):
     """Parse a <measure>...</measure> element, adding it and its contents to the part.
 
     Parameters
@@ -509,6 +543,8 @@ def _handle_measure(measure_el, position, part, ongoing, doc_order, measure_coun
         The index of the first note element in the current measure in the xml file.
     measure_counter : int
         The index of the <measure> tag in the xml file, starting from 1
+    ignore_invisible_objects : bool, optional
+        When True, objects that with the attribute `print-object="no"` will be ignored.
 
     Returns
     -------
@@ -536,6 +572,19 @@ def _handle_measure(measure_el, position, part, ongoing, doc_order, measure_coun
     measure_maxtime = measure_start
     trailing_children = []
     for i, e in enumerate(measure_el):
+        # If the object is invisible and the user wants it, skip the object
+        # Will probably not skip everything, but works at least for notes and rests
+        if ignore_invisible_objects:
+            print_obj = get_value_from_attribute(e, "print-object", str)
+            notehead = e.find("notehead")  # Musescore mask notes with notehead="none"
+            if print_obj == "no" or (notehead is not None and notehead.text == "none"):
+                # Still update position for invisible notes (to avoid problems with backups)
+                if e.tag == "note":
+                    duration = get_value_from_tag(e, "duration", int) or 0
+                    position += duration
+                # Skip the object
+                continue
+
         if e.tag == "backup":
             # <xs:documentation>The backup and forward elements are required
             # to coordinate multiple voices in one part, including music on
@@ -656,7 +705,13 @@ def _handle_harmony(e, position, part):
         text = e.find("function").text
         if text is not None:
             if "|" in text:
-                text, cadence_annotation = text.split("|")
+                text = text.split("|")
+                if len(text) > 2:
+                    warnings.warn(
+                        f"Ignoring multiple cadence annotations {text[2:]}",
+                        stacklevel=2,
+                    )
+                text, cadence_annotation = text[0], text[1]
                 part.add(score.Cadence(cadence_annotation), position)
             part.add(score.RomanNumeral(text), position)
     elif e.find("kind") is not None and e.find("root") is not None:
@@ -1198,6 +1253,9 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
     # initialize beam to None
     beam = None
 
+    # get the stem direction of the note if any
+    stem_dir = get_value_from_tag(e, "stem", str) or None
+
     # add support of uppercase "ID" tags
     note_id = (
         get_value_from_attribute(e, "id", str)
@@ -1228,6 +1286,8 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
         # same duration
         assert prev_note is not None
         position = prev_note.start.t
+        duration = prev_note.duration
+        duration_from_symbolic = prev_note.duration_from_symbolic
 
     articulations_e = e.find("notations/articulations")
     if articulations_e is not None:
@@ -1240,6 +1300,12 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
         ornaments = get_ornaments(ornaments_e)
     else:
         ornaments = {}
+
+    technical_e = e.find("notations/technical")
+    if technical_e is not None:
+        technical_notations = get_technical_notations(technical_e)
+    else:
+        technical_notations = {}
 
     pitch = e.find("pitch")
     unpitch = e.find("unpitched")
@@ -1268,8 +1334,10 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
                 symbolic_duration=symbolic_duration,
                 articulations=articulations,
                 ornaments=ornaments,
+                technical=technical_notations,
                 steal_proportion=steal_proportion,
                 doc_order=doc_order,
+                stem_direction=stem_dir,
             )
             if isinstance(prev_note, score.GraceNote) and prev_note.voice == voice:
                 note.grace_prev = prev_note
@@ -1305,7 +1373,9 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
                 symbolic_duration=symbolic_duration,
                 articulations=articulations,
                 ornaments=ornaments,
+                technical=technical_notations,
                 doc_order=doc_order,
+                stem_direction=stem_dir,
             )
 
         if isinstance(prev_note, score.GraceNote) and prev_note.voice == voice:
@@ -1333,8 +1403,10 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
             notehead=notehead,
             noteheadstyle=noteheadstylebool,
             articulations=articulations,
+            technical=technical_notations,
             symbolic_duration=symbolic_duration,
             doc_order=doc_order,
+            stem_direction=stem_dir,
         )
 
     else:
@@ -1345,9 +1417,9 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
             staff=staff,
             symbolic_duration=symbolic_duration,
             articulations=articulations,
+            technical=technical_notations,
             doc_order=doc_order,
         )
-
     part.add(note, position, position + duration)
 
     # After note is assigned to part we can assign the beam to the note if it exists
@@ -1425,16 +1497,62 @@ def handle_tuplets(notations, ongoing, note):
         stop_tuplet_key = ("stop_tuplet", tuplet_number)
 
         if tuplet_type == "start":
+            # Get information about the tuplet if present in the XML
+            tuplet_actual = tuplet_e.find("tuplet-actual")
+            tuplet_normal = tuplet_e.find("tuplet-normal")
+            if tuplet_actual is not None and tuplet_normal is not None:
+                tuplet_actual_notes = get_value_from_tag(
+                    tuplet_actual, "tuplet-number", int
+                )
+                tuplet_actual_type = get_value_from_tag(
+                    tuplet_actual, "tuplet-type", str
+                )
+                tuplet_normal_notes = get_value_from_tag(
+                    tuplet_normal, "tuplet-number", int
+                )
+                tuplet_normal_type = get_value_from_tag(
+                    tuplet_normal, "tuplet-type", str
+                )
+            # If no information, try to infer it from the note
+            else:
+                tuplet_actual_notes = note.symbolic_duration.get("actual_notes", None)
+                tuplet_normal_notes = note.symbolic_duration.get("normal_notes", None)
+                tuplet_actual_type = note.symbolic_duration.get("type", None)
+                tuplet_normal_type = tuplet_actual_type
+
+            # If anyone of the attributes is not set, we set them all to None as we can't really
+            # do anything useful with only partial information about the tuplet
+            if None in (
+                tuplet_actual_notes,
+                tuplet_normal_notes,
+                tuplet_actual_type,
+                tuplet_normal_type,
+            ):
+                tuplet_actual_notes = None
+                tuplet_normal_notes = None
+                tuplet_actual_type = None
+                tuplet_normal_type = None
+
             # check if we have a stopped_tuplet in ongoing that corresponds to
             # this start
             tuplet = ongoing.pop(stop_tuplet_key, None)
 
             if tuplet is None:
-                tuplet = score.Tuplet(note)
+                tuplet = score.Tuplet(
+                    note,
+                    actual_notes=tuplet_actual_notes,
+                    normal_notes=tuplet_normal_notes,
+                    actual_type=tuplet_actual_type,
+                    normal_type=tuplet_normal_type,
+                )
                 ongoing[start_tuplet_key] = tuplet
 
             else:
                 tuplet.start_note = note
+                tuplet.actual_notes = tuplet_actual_notes
+                tuplet.normal_notes = tuplet_normal_notes
+                tuplet.actual_type = tuplet_actual_type
+                tuplet.normal_type = tuplet_normal_type
 
             starting_tuplets.append(tuplet)
 
@@ -1453,7 +1571,7 @@ def handle_tuplets(notations, ongoing, note):
     # assert that starting tuplet times are before stopping tuplet times
     for start_tuplet, stop_tuplet in zip(starting_tuplets, stopping_tuplets):
         assert (
-            start_tuplet.start_note.start.t < stop_tuplet.end_note.start.t
+            start_tuplet.start_note.start.t <= stop_tuplet.end_note.start.t
         ), "Tuplet start time is after tuplet stop time"
     return starting_tuplets, stopping_tuplets
 
@@ -1640,6 +1758,51 @@ def get_ornaments(e):
         "other-ornament",
     )
     return [a for a in ornaments if e.find(a) is not None]
+
+
+def get_technical_notations(e: etree._Element) -> List[score.NoteTechnicalNotation]:
+    # For a full list of technical notations
+    # https://usermanuals.musicxml.com/MusicXML/Content/EL-MusicXML-technical.htm
+    # for now we only support fingering
+    technical_notation_parsers = {
+        "fingering": parse_fingering,
+    }
+
+    technical_notations = [
+        parser(e.find(a))
+        for a, parser in technical_notation_parsers.items()
+        if e.find(a) is not None
+    ]
+
+    return technical_notations
+
+
+def parse_fingering(e: etree._Element) -> score.Fingering:
+
+    try:
+        # There seems to be a few cases with fingerings encoded like 4_1.
+        # This is not standard in MusicXML according to the documentation,
+        # but since it appears in files from the web, and can be displayed
+        # with MuseScore, the solution for now is just to take the fist value.
+        finger_info = parse_ints(e.text)
+    except Exception as e:
+        # Do not raise an error if fingering info cannot be parsed, insted
+        # just set it as None.
+        warnings.warn(f"Cannot parse fingering info for {e.text}!")
+        finger_info = [None]
+
+    is_alternate = e.attrib.get("alternate", False)
+    is_substitution = e.attrib.get("substitution", False)
+    placement = e.attrib.get("placement", None)
+
+    # If there is more than one finger, only take the first one
+    fingering = score.Fingering(
+        fingering=finger_info[0],
+        is_substitution=is_alternate,
+        is_alternate=is_alternate,
+        placement=placement,
+    )
+    return fingering
 
 
 @deprecated_alias(fn="filename")

@@ -47,6 +47,7 @@ pitch_class_pattern = re.compile("(?P<step>[A-Ga-g])(?P<alter>[#bn]*)")
 
 number_pattern = re.compile(r"\d+")
 vnumber_pattern = re.compile(r"v\d+")
+fingering_pattern = re.compile(r"fingering\d+")
 
 # For matchfiles before 1.0.0.
 old_version_pattern = re.compile(r"^(?P<minor>[0-9]+)\.(?P<patch>[0-9]+)")
@@ -516,7 +517,7 @@ def interpret_as_fractional(value: str) -> FractionalSymbolicDuration:
 
 
 def format_fractional(
-    value: Union[List[FractionalSymbolicDuration], FractionalSymbolicDuration]
+    value: Union[List[FractionalSymbolicDuration], FractionalSymbolicDuration],
 ) -> str:
     """
     Format fractional symbolic duration as string

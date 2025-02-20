@@ -60,7 +60,7 @@
       </score-part>
     </part-list>
   <part id="P1">
-    <measure number="1" width="511.52">
+    <measure number="4" width="511.52">
       <print>
         <system-layout>
           <system-margins>
@@ -138,7 +138,7 @@
           </notations>
         </note>
       </measure>
-    <measure number="2" width="467.05">
+    <measure number="4a" width="467.05">
       <direction placement="below">
         <direction-type>
           <dynamics default-x="4.70" default-y="-40.00" relative-y="-25.00">

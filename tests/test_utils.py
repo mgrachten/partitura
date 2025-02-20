@@ -643,3 +643,69 @@ if HAS_MIDITOK:
             pt_tokens = [tok for tok in pt_tokens if not tok.startswith("Velocity")]
             mtok_tokens = [tok for tok in mtok_tokens if not tok.startswith("Velocity")]
             self.assertTrue(pt_tokens == mtok_tokens)
+
+
+    class TestSymbolicDurationEstimator(unittest.TestCase):
+        def test_estimate_symbolic_duration(self):
+            """
+            Test `estimate_symbolic_duration`
+            """
+            divs = 12
+            quarters = 4
+            expected = [
+                {},
+                {'type': '32nd', 'actual_notes': 3, 'normal_notes': 2},
+                {'type': '16th', 'actual_notes': 3, 'normal_notes': 2},
+                {'type': '16th', 'dots': 0},
+                {'type': 'eighth', 'actual_notes': 3, 'normal_notes': 2},
+                ({'type': '16th', 'dots': 0}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'eighth', 'dots': 0},
+                ({'type': 'eighth', 'dots': 0}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'quarter', 'actual_notes': 3, 'normal_notes': 2},
+                {'type': 'eighth', 'dots': 1},
+                ({'type': 'eighth', 'dots': 0}, {'type': 'eighth', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'eighth', 'dots': 1}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'quarter', 'dots': 0},
+                ({'type': 'quarter', 'dots': 0}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'quarter', 'dots': 0}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'quarter', 'dots': 0}, {'type': '16th', 'dots': 0}),
+                {'type': 'half', 'actual_notes': 3, 'normal_notes': 2},
+                ({'type': 'quarter', 'dots': 0}, {'type': '16th', 'dots': 0}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'quarter', 'dots': 1},
+                ({'type': 'quarter', 'dots': 1}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'quarter', 'dots': 1}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'quarter', 'dots': 2},
+                ({'type': 'quarter', 'dots': 1}, {'type': 'eighth', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'quarter', 'dots': 2}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'half', 'dots': 0},
+                ({'type': 'half', 'dots': 0}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': '16th', 'dots': 0}),
+                ({'type': 'half', 'dots': 0}, {'type': 'eighth', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': '16th', 'dots': 0}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': 'eighth', 'dots': 0}),
+                ({'type': 'half', 'dots': 0}, {'type': 'eighth', 'dots': 0}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': 'quarter', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': 'eighth', 'dots': 1}),
+                ({'type': 'half', 'dots': 0}, {'type': 'eighth', 'dots': 0}, {'type': 'eighth', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 0}, {'type': 'eighth', 'dots': 1}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'half', 'dots': 1},
+                ({'type': 'half', 'dots': 1}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 1}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 1}, {'type': '16th', 'dots': 0}),
+                ({'type': 'half', 'dots': 1}, {'type': 'eighth', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 1}, {'type': '16th', 'dots': 0}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'half', 'dots': 2},
+                ({'type': 'half', 'dots': 2}, {'type': '32nd', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 1}, {'type': 'quarter', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                {'type': 'half', 'dots': 3},
+                ({'type': 'half', 'dots': 2}, {'type': 'eighth', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+                ({'type': 'half', 'dots': 3}, {'type': '16th', 'dots': 0, 'actual_notes': 3, 'normal_notes': 2}),
+            ]
+            predicted = []
+            for k in range(divs * 0, divs * quarters):
+                a = partitura.utils.estimate_symbolic_duration(
+                    k, divs, return_com_durations=True)
+                predicted.append(a)
+            self.assertTrue(all([expected[i] == predicted[i] for i in range(len(expected))]))
+            

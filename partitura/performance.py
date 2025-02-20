@@ -152,8 +152,8 @@ class PerformedPart(object):
 
     def note_array(self, *args, **kwargs) -> np.ndarray:
         """Structured array containing performance information.
-        The fields are 'id', 'pitch', 'onset_div', 'duration_div',
-        'onset_sec', 'duration_sec' and 'velocity'.
+        The fields are 'id', 'pitch', 'onset_tick', 'duration_tick',
+        'onset_sec', 'duration_sec', 'track', 'channel', and 'velocity'.
         """
 
         fields = [
@@ -178,7 +178,7 @@ class PerformedPart(object):
             duration_sec = offset - note_on_sec
             duration_tick = (
                 n.get(
-                    "note_off_tick",
+                    seconds_to_midi_ticks(n["sound_off"], mpq=self.mpq, ppq=self.ppq),
                     seconds_to_midi_ticks(n["note_off"], mpq=self.mpq, ppq=self.ppq),
                 )
                 - note_on_tick
@@ -206,9 +206,19 @@ class PerformedPart(object):
         id: str = None,
         part_name: str = None,
     ):
-        """Create an instance of PerformedPart from a note_array.
+        """
+        Create an instance of PerformedPart from a note_array.
         Note that this property does not include non-note information (i.e.
-        controls such as sustain pedal).
+        controls such as sustain pedal, program changes, tempo changes, etc.).
+
+        The following fields are mandatory:
+        'pitch', 'onset_sec', 'duration_sec',  and 'velocity'.
+
+        The following fields are used if available:
+        'id',  'track', 'channel'.
+
+        The following fields are ignored:
+        'onset_tick', 'duration_tick', all others
         """
         if "id" not in note_array.dtype.names:
             n_ids = ["n{0}".format(i) for i in range(len(note_array))]
@@ -271,7 +281,6 @@ def adjust_offsets_w_sustain(
     pedal = pedal[np.argsort(pedal[:, 0]), :]
 
     # reduce the pedal info to just the times where there is a change in pedal state
-
     pedal = np.vstack(
         (
             (min(pedal[0, 0] - 1, first_off - 1), 0),
@@ -289,6 +298,21 @@ def adjust_offsets_w_sustain(
     next_pedal_time = pedal[last_pedal_change_before_off + 1, 0]
 
     offs[pedal_down_at_off] = next_pedal_time[pedal_down_at_off]
+
+    # adjust offset times of notes that have a reonset while the sustain pedal is on
+    pitches = np.array([n["midi_pitch"] for n in notes])
+    note_ons = np.array([n["note_on"] for n in notes])
+
+    for pitch in np.unique(pitches):
+        pitch_indices = np.where(pitches == pitch)[0]
+
+        sorted_indices = pitch_indices[np.argsort(note_ons[pitch_indices])]
+        sorted_note_ons = note_ons[sorted_indices]
+        sorted_sound_offs = offs[sorted_indices]
+
+        adjusted_sound_offs = np.minimum(sorted_sound_offs[:-1], sorted_note_ons[1:])
+
+        offs[sorted_indices[:-1]] = adjusted_sound_offs
 
     for offset, note in zip(offs, notes):
         note["sound_off"] = offset
@@ -338,7 +362,7 @@ class PerformedNote:
         return f"PerformedNote: {self['id']}"
 
     def __eq__(self, other):
-        if not isinstance(PerformedNote):
+        if not isinstance(other, PerformedNote):
             return False
         if not self.keys() == other.keys():
             return False

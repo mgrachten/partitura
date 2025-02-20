@@ -45,6 +45,10 @@ MUSICXML_UNFOLD_TESTPAIRS = [
         )
     ]
 ]
+MUSICXML_TUPLET_ATTRIBUTES_TESTFILES = [
+    os.path.join(MUSICXML_PATH, fn)
+    for fn in ["test_tuplet_attributes.musicxml"]
+]
 
 MUSICXML_UNFOLD_COMPLEX = [
     (
@@ -75,6 +79,11 @@ MUSICXML_UNFOLD_DACAPO = [
         os.path.join(MUSICXML_PATH, fn2),
     )
     for fn1, fn2 in [("test_unfold_dacapo.xml", "test_unfold_dacapo_result.xml")]
+]
+
+MUSICXML_IGNORE_INVISIBLE_OBJECTS = [
+    os.path.join(MUSICXML_PATH, fn)
+    for fn in ["test_ignore_invisible_objects.musicxml"]
 ]
 
 # This is a list of files for testing Chew and Wu's VOSA. (More files to come?)
@@ -112,6 +121,11 @@ TIME_SIGNATURE_MAP_EDGECASES_TESTFILES = [
     for fn in ["test_ts_map_ts_starts_not_at_zero.xml"]
 ]
 
+CLEF_MAP_TESTFILES = [
+    os.path.join(MUSICXML_PATH, fn)
+    for fn in ["test_clef_map.musicxml"]
+]
+
 REST_ARRAY_TESTFILES = [
     os.path.join(MUSICXML_PATH, fn)
     for fn in ["test_unfold_complex.xml", "test_rest.musicxml"]
@@ -132,8 +146,11 @@ MERGE_PARTS_TESTFILES = [
         "test_single_part_change_divs.xml",
         "test_merge_voices1.xml",
         "test_merge_voices2.xml",
-    ]
-]
+    ]] + [
+    os.path.join(MEI_PATH, fn)
+    for fn in [
+        "test_merge_voices2.mei",
+    ]]
 
 PIANOROLL_TESTFILES = [
     os.path.join(MUSICXML_PATH, fn)
@@ -196,6 +213,7 @@ MUSESCORE_TESTFILES = [
 ]
 
 KERN_TIES = [os.path.join(KERN_PATH, fn) for fn in ["tie_mismatch.krn"]]
+
 M21_TESTFILES = [
     os.path.join(DATA_PATH, "musicxml", fn)
     for fn in [
@@ -205,6 +223,7 @@ M21_TESTFILES = [
         "test_note_ties.xml",
     ]
 ]
+
 HARMONY_TESTFILES = [os.path.join(MUSICXML_PATH, fn) for fn in ["test_harmony.musicxml"]]
 
 MOZART_VARIATION_FILES = dict(
@@ -219,7 +238,6 @@ MOZART_VARIATION_FILES = dict(
     parangonada_ppart=os.path.join(PARANGONADA_PATH, "mozart_k265_var1", "ppart.csv"),
     parangonada_zalign=os.path.join(PARANGONADA_PATH, "mozart_k265_var1", "zalign.csv"),
 )
-
 
 WAV_TESTFILES = [
     os.path.join(WAV_PATH, fn)
@@ -245,4 +263,18 @@ MIDIEXPORT_TESTFILES = [
 
 MIDIINPORT_TESTFILES = [
     os.path.join(DATA_PATH, "midi", "bach_midi_score.mid")
+]
+
+CLEF_TESTFILES = [
+    os.path.join(DATA_PATH, "musicxml", "test_clef.musicxml")
+]
+
+CROSS_STAFF_TESTFILES = [
+    os.path.join(DATA_PATH, "musicxml", "test_cross_staff_beaming.musicxml"),
+    os.path.join(DATA_PATH, MUSICXML_PATH, "test_cross_staff_voices.musicxml"),
+    os.path.join(DATA_PATH, MEI_PATH, "test_cross_staff_voices.mei"),
+]
+
+MUSICXML_CHORD_FEATURES = [
+    os.path.join(MUSICXML_PATH, fn) for fn in ["test_chord_duration.musicxml"]
 ]

@@ -7,14 +7,18 @@ This module contains test functions for MusicXML import and export.
 import logging
 import unittest
 from tempfile import TemporaryFile
+from fractions import Fraction
 
 from tests import (
     MUSICXML_IMPORT_EXPORT_TESTFILES,
     MUSICXML_SCORE_OBJECT_TESTFILES,
+    MUSICXML_TUPLET_ATTRIBUTES_TESTFILES,
     MUSICXML_UNFOLD_TESTPAIRS,
     MUSICXML_UNFOLD_COMPLEX,
     MUSICXML_UNFOLD_VOLTA,
     MUSICXML_UNFOLD_DACAPO,
+    MUSICXML_CHORD_FEATURES,
+    MUSICXML_IGNORE_INVISIBLE_OBJECTS,
 )
 
 from partitura import load_musicxml, save_musicxml
@@ -212,6 +216,30 @@ class TestMusicXML(unittest.TestCase):
         part1 = make_part_slur()
         self._pretty_export_import_pretty_test(part1)
 
+    def test_stem_direction_import(self):
+        # test if stem direction is imported correctly for the first note of test_note_ties.xml
+        part = load_musicxml(MUSICXML_IMPORT_EXPORT_TESTFILES[0])[0]
+        self.assertEqual(part.notes_tied[0].stem_direction, "up")
+
+    def test_tuplet_attributes(self):
+        part = load_musicxml(MUSICXML_TUPLET_ATTRIBUTES_TESTFILES[0])[0]
+        tuplets = list(part.iter_all(cls=score.Tuplet))
+        # Each tuple consists of (actual_notes, normal_notes, type, note_type, duration_multiplier)
+        real_values = [
+            (3, 2, "eighth", "eighth", Fraction(2, 3)),
+            (5, 4, "eighth", "eighth", Fraction(4, 5)),
+            (3, 2, "16th", "16th", Fraction(2, 3)),
+            (9, 2, "16th", "quarter", Fraction(8, 9)),
+            (2, 3, "eighth", "eighth", Fraction(3, 2)),
+            (5, 3, "eighth", "eighth", Fraction(3, 5)),
+        ]
+        for tuplet, (n_actual, n_normal, t_actual, t_normal, dur_mult) in zip(tuplets, real_values):
+            self.assertEqual(tuplet.actual_notes, n_actual)
+            self.assertEqual(tuplet.normal_notes, n_normal)
+            self.assertEqual(tuplet.actual_type, t_actual)
+            self.assertEqual(tuplet.normal_type, t_normal)
+            self.assertEqual(tuplet.duration_multiplier, dur_mult)
+
     def _pretty_export_import_pretty_test(self, part1):
         # pretty print the part
         pstring1 = part1.pretty()
@@ -250,6 +278,42 @@ class TestMusicXML(unittest.TestCase):
 
         self.assertTrue(score.work_title == test_work_title)
         self.assertTrue(score.work_number == test_work_number)
+
+    def test_chord_duration(self):
+        part = load_musicxml(MUSICXML_CHORD_FEATURES[0]).parts[0]
+        score.assign_note_ids(part)
+        sna = part.note_array()
+        
+        self.assertEqual(sna[sna['id'] == 'n1']['duration_beat'], 2)
+        self.assertEqual(sna[sna['id'] == 'n2']['duration_beat'], 2)
+        self.assertEqual(sna[sna['id'] == 'n1']['duration_quarter'], 2)
+        self.assertEqual(sna[sna['id'] == 'n2']['duration_quarter'], 2)
+    
+    def test_import_ignore_invisible_objects(self):
+        score_w_invisible = load_musicxml(MUSICXML_IGNORE_INVISIBLE_OBJECTS[0])[0]
+        score_wo_invisible = load_musicxml(MUSICXML_IGNORE_INVISIBLE_OBJECTS[0], ignore_invisible_objects=True)[0]
+
+        note_w_invisible_objs = score_w_invisible.note_array()
+        note_wo_invisible_objs = score_wo_invisible.note_array()
+
+        # Convert back from structured array to simple tuples as hash problems with set otherwise
+        note_w_invisible_objs = set(
+            [(n["pitch"], n["onset_beat"], n["duration_beat"]) for n in note_w_invisible_objs]
+        )
+        note_wo_invisible_objs = set(
+            [(n["pitch"], n["onset_beat"], n["duration_beat"]) for n in note_wo_invisible_objs]
+        )
+        # Make sure all notes in the filtered score are also in the unfiltered score
+        self.assertTrue(note_wo_invisible_objs.issubset(note_w_invisible_objs))
+
+        self.assertTrue(len(note_w_invisible_objs) == 11)
+        self.assertTrue(len(note_wo_invisible_objs) == 6)
+
+        self.assertTrue(len(score_w_invisible.rests) == 1)
+        self.assertTrue(len(score_wo_invisible.rests) == 0)
+
+        self.assertTrue(len(list(score_w_invisible.iter_all(cls=score.Beam))) == 1)
+        self.assertTrue(len(list(score_wo_invisible.iter_all(cls=score.Beam))) == 0)
 
 
 def make_part_slur():

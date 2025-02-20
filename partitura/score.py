@@ -8,21 +8,22 @@ loudness directions. A score is defined at the highest level by a
 object). This object serves as a timeline at which musical elements
 are registered in terms of their start and end times.
 """
-
 from copy import copy, deepcopy
 from collections import defaultdict
 from collections.abc import Iterable
+from fractions import Fraction
 from numbers import Number
 from partitura.utils.globals import (
     MUSICAL_BEATS,
     INTERVALCLASSES,
     INTERVAL_TO_SEMITONES,
+    LABEL_DURS,
 )
 import warnings, sys
 import numpy as np
 import re
 from scipy.interpolate import PPoly
-from typing import Union, List, Optional, Iterator, Iterable as Itertype
+from typing import Union, List, Optional, Iterator, Any, Iterable as Itertype
 import difflib
 from partitura.utils import (
     ComparableMixin,
@@ -46,6 +47,7 @@ from partitura.utils import (
     key_mode_to_int,
     _OrderedSet,
     update_note_ids_after_unfolding,
+    clef_sign_to_int,
 )
 from partitura.utils.generic import interp1d
 from partitura.utils.music import transpose_note, step2pc
@@ -228,6 +230,78 @@ class Part(object):
             bounds_error=False,
             fill_value="extrapolate",
         )
+
+    @property
+    def clef_map(self):
+        """A function mapping timeline times to the clef in each
+        staff at that time. The function can take scalar
+        values or lists/arrays of values
+
+        Returns
+        -------
+        function
+            The mapping function
+        """
+        clefs = np.array(
+            [
+                (
+                    c.start.t,
+                    c.staff,
+                    clef_sign_to_int(c.sign),
+                    c.line,
+                    c.octave_change if c.octave_change is not None else 0,
+                )
+                for c in self.iter_all(Clef)
+            ]
+        )
+
+        interpolators = []
+        for s in range(1, self.number_of_staves + 1):
+            staff_clefs = clefs[clefs[:, 1] == s]
+            if len(staff_clefs) == 0:
+                # default "none" clef
+                staff, clef, line, octave_change = s, clef_sign_to_int("none"), 0, 0
+
+                warnings.warn(
+                    "No clefs found on staff {}, assuming {} clef.".format(s, clef)
+                )
+                if self.first_point is None:
+                    t0, tN = 0, 0
+                else:
+                    t0 = self.first_point.t
+                    tN = self.last_point.t
+                staff_clefs = np.array(
+                    [
+                        (t0, staff, clef, line, octave_change),
+                        (tN, staff, clef, line, octave_change),
+                    ]
+                )
+            elif len(staff_clefs) == 1:
+                # If there is only a single clef
+                staff_clefs = np.array([staff_clefs[0, :], staff_clefs[0, :]])
+
+            if staff_clefs[0, 0] > self.first_point.t:
+                staff_clefs = np.vstack(
+                    ((self.first_point.t, *staff_clefs[0, 1:]), staff_clefs)
+                )
+
+            interpolators.append(
+                interp1d(
+                    staff_clefs[:, 0],
+                    staff_clefs[:, 1:],
+                    axis=0,
+                    kind="previous",
+                    bounds_error=False,
+                    fill_value="extrapolate",
+                )
+            )
+
+        def collator(time: Union[int, np.ndarray]) -> np.ndarray:
+            return np.array(
+                [interpolator(time) for interpolator in interpolators], dtype=int
+            )
+
+        return collator
 
     @property
     def measure_map(self):
@@ -1626,6 +1700,11 @@ class GenericNote(TimedObject):
         appearance of this note (with respect to other notes) in the
         document in case the Note belongs to a part that was imported
         from MusicXML. Defaults to None.
+    stem_direction : str, optional
+        The stem direction of the note. Can be 'up', 'down', or None.
+        Defaults to None.
+    technical: list, optional
+        Technical notation elements.
 
     """
 
@@ -1638,6 +1717,8 @@ class GenericNote(TimedObject):
         articulations=None,
         ornaments=None,
         doc_order=None,
+        stem_direction=None,
+        technical=None,
         **kwargs,
     ):
         self._sym_dur = None
@@ -1648,8 +1729,11 @@ class GenericNote(TimedObject):
         self.symbolic_duration = symbolic_duration
         self.articulations = articulations
         self.ornaments = ornaments
+        self.technical = technical
         self.doc_order = doc_order
-
+        self.stem_direction = (
+            stem_direction if stem_direction in ("up", "down") else None
+        )
         # these attributes are set after the instance is constructed
         self.fermata = None
         self.tie_prev = None
@@ -2319,12 +2403,24 @@ class Tuplet(TimedObject):
 
     """
 
-    def __init__(self, start_note=None, end_note=None):
+    def __init__(
+        self,
+        start_note=None,
+        end_note=None,
+        actual_notes=None,
+        normal_notes=None,
+        actual_type=None,
+        normal_type=None,
+    ):
         super().__init__()
         self._start_note = None
         self._end_note = None
         self.start_note = start_note
         self.end_note = end_note
+        self.actual_notes = actual_notes
+        self.normal_notes = normal_notes
+        self.actual_type = actual_type
+        self.normal_type = normal_type
         # maintain a list of attributes to update when cloning this instance
         self._ref_attrs.extend(["start_note", "end_note"])
 
@@ -2362,10 +2458,52 @@ class Tuplet(TimedObject):
             note.tuplet_stops.append(self)
         self._end_note = note
 
+    @property
+    def duration_multiplier(self) -> Fraction:
+        """Ratio by which the durations are scaled with this tuplet, as a python Fraction object.
+        This property is similar to `.tupletMultiplier` in music21:
+        https://www.music21.org/music21docs/moduleReference/moduleDuration.html#music21.duration.Tuplet.tupletMultiplier
+
+        For example, in a triplet of eighth notes, each eighth note would have a duration of
+        duration_multiplier * normal_eighth_duration = 2/3 * normal_eighth_duration
+        """
+        if self.actual_type == self.normal_type:
+            return Fraction(self.normal_notes, self.actual_notes)
+        else:
+            # In that case, we need to convert the normal_type into the actual_type, therefore
+            # adapting normal_notes
+            actual_dur = Fraction(LABEL_DURS[self.actual_type])
+            normal_dur = Fraction(LABEL_DURS[self.normal_type])
+            return (
+                Fraction(self.normal_notes, self.actual_notes) * normal_dur / actual_dur
+            )
+
     def __str__(self):
+        n_actual = (
+            ""
+            if self.actual_notes is None
+            else "actual_notes={}".format(self.actual_notes)
+        )
+        n_normal = (
+            ""
+            if self.normal_notes is None
+            else "normal_notes={}".format(self.normal_notes)
+        )
+        t_actual = (
+            ""
+            if self.actual_type is None
+            else "actual_type={}".format(self.actual_type)
+        )
+        t_normal = (
+            ""
+            if self.normal_type is None
+            else "normal_type={}".format(self.normal_type)
+        )
         start = "" if self.start_note is None else "start={}".format(self.start_note.id)
         end = "" if self.end_note is None else "end={}".format(self.end_note.id)
-        return " ".join((super().__str__(), start, end)).strip()
+        return " ".join(
+            (super().__str__(), start, end, n_actual, n_normal, t_actual, t_normal)
+        ).strip()
 
 
 class Repeat(TimedObject):
@@ -3102,7 +3240,9 @@ class ChordSymbol(Harmony):
     """A harmony element in the score usually for Chord Symbols."""
 
     def __init__(self, root, kind, bass=None):
-        super().__init__(text=root + kind + (f"/{bass}" if bass else ""))
+        super().__init__(
+            text=root + (f"/{kind}" if kind else "") + (f"/{bass}" if bass else "")
+        )
         self.kind = kind
         self.root = root
         self.bass = bass
@@ -3297,6 +3437,58 @@ class ResetTempoDirection(ConstantTempoDirection):
         for d in self.start.iter_prev(ConstantTempoDirection):
             direction = d
         return direction
+
+
+class NoteTechnicalNotation(object):
+    """
+    This object represents technical notations that
+    are part of a GenericNote object (e.g., fingering,)
+    These elements depend on a note, but can have their own properties
+    """
+
+    def __init__(self, type: str, info: Optional[Any] = None) -> None:
+        self.type = type
+        self.info = info
+
+
+class Fingering(NoteTechnicalNotation):
+    """
+    This object represents fingering. For now, it supports attributes
+    present in MusicXML:
+
+    https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/fingering/
+
+    Parameters
+    ----------
+    fingering : Optional[int]
+        Fingering information. Can be None (usually the result of incorrect parsing of fingering).
+
+    is_substitution: bool
+        Whether this fingering is a substitution in the middle of a note. Default is False
+
+    is_alternate: bool
+        Whether this fingering is an alternative fingering. Default is False
+
+    placement: str
+        Placement of the fingering (above or below a note)
+    """
+
+    def __init__(
+        self,
+        fingering: Optional[int],
+        is_substitution: bool = False,
+        placement: Optional[str] = None,
+        is_alternate: bool = False,
+    ) -> None:
+        super().__init__(
+            type="fingering",
+            info=fingering,
+        )
+        self.fingering = fingering
+        self.is_alternate = is_alternate
+        self.alternative_fingering = []
+        self.is_substitution = is_substitution
+        self.placement = placement
 
 
 class PartGroup(object):
@@ -3769,11 +3961,8 @@ def add_measures(part):
                 if existing_measure.start.t == measure_start:
                     assert existing_measure.end.t > pos
                     pos = existing_measure.end.t
-                    if existing_measure.number != 0:
-                        # if existing_measure is a match anacrusis measure,
-                        # keep number 0
-                        existing_measure.number = mcounter
-                        mcounter += 1
+                    existing_measure.number = mcounter
+                    mcounter += 1
                     continue
 
                 else:
@@ -4350,7 +4539,7 @@ class Segment(TimedObject):
         self.info = info
 
 
-def add_segments(part):
+def add_segments(part, force_new=False):
     """
     Add segment objects to a part based on repetition and capo/fine/coda/segno directions.
 
@@ -4358,275 +4547,260 @@ def add_segments(part):
     ----------
     part: part
         A score part
+    force_new: all_repeats : bool, optional
+        Flag to delete and add segments from scratch,
+        used for creating new unfoldings after segment attributes have been changed.
+        defaults to false.
     """
-    if len([seg for seg in part.iter_all(Segment)]) > 0:
-        # only add segments if no segments exist
-        pass
-    else:
-        boundaries = defaultdict(dict)
-        destinations = defaultdict(list)
+    existing_segments = [seg for seg in part.iter_all(Segment)]
+    if len(existing_segments) > 0:
+        if force_new:
+            for seg in existing_segments:
+                part.remove(seg)
+        else:
+            return
 
-        valid_repeats = [
-            r
-            for r in part.iter_all(Repeat)
-            if r.start is not None and r.end is not None
-        ]
-        valid_endings = [
-            r
-            for r in part.iter_all(Ending)
-            if r.start is not None and r.end is not None
-        ]
+    boundaries = defaultdict(dict)
+    destinations = defaultdict(list)
 
-        for r in valid_repeats:
-            boundaries[r.start.t]["repeat_start"] = r
-            boundaries[r.end.t]["repeat_end"] = r
-        for v in valid_endings:
-            boundaries[v.start.t]["volta_start"] = v
-            boundaries[v.end.t]["volta_end"] = v
-        for c in part.iter_all(Coda):
-            boundaries[c.start.t]["coda"] = c
-            destinations["coda"].append(c.start.t)
-        for c in part.iter_all(ToCoda):
-            boundaries[c.start.t]["tocoda"] = c
-        for c in part.iter_all(DaCapo):
-            boundaries[c.start.t]["dacapo"] = c
-        for c in part.iter_all(Fine):
-            boundaries[c.start.t]["fine"] = c
-        for c in part.iter_all(Segno):
-            boundaries[c.start.t]["segno"] = c
-            destinations["segno"].append(c.start.t)
-        for c in part.iter_all(DalSegno):
-            boundaries[c.start.t]["dalsegno"] = c
+    valid_repeats = [
+        r for r in part.iter_all(Repeat) if r.start is not None and r.end is not None
+    ]
+    valid_endings = [
+        r for r in part.iter_all(Ending) if r.start is not None and r.end is not None
+    ]
 
-        boundaries[part.last_point.t]["end"] = None
-        boundaries[part.first_point.t]["start"] = None
+    for r in valid_repeats:
+        boundaries[r.start.t]["repeat_start"] = r
+        boundaries[r.end.t]["repeat_end"] = r
+    for v in valid_endings:
+        boundaries[v.start.t]["volta_start"] = v
+        boundaries[v.end.t]["volta_end"] = v
+    for c in part.iter_all(Coda):
+        boundaries[c.start.t]["coda"] = c
+        destinations["coda"].append(c.start.t)
+    for c in part.iter_all(ToCoda):
+        boundaries[c.start.t]["tocoda"] = c
+    for c in part.iter_all(DaCapo):
+        boundaries[c.start.t]["dacapo"] = c
+    for c in part.iter_all(Fine):
+        boundaries[c.start.t]["fine"] = c
+    for c in part.iter_all(Segno):
+        boundaries[c.start.t]["segno"] = c
+        destinations["segno"].append(c.start.t)
+    for c in part.iter_all(DalSegno):
+        boundaries[c.start.t]["dalsegno"] = c
 
-        boundary_times = list(boundaries.keys())
-        boundary_times.sort()
+    boundaries[part.last_point.t]["end"] = None
+    boundaries[part.first_point.t]["start"] = None
 
-        # for every segment get an id, its jump destinations and properties
-        init_character = 65
-        segment_info = dict()
-        for i, (s, e) in enumerate(zip(boundary_times[:-1], boundary_times[1:])):
-            segment_info[s] = {
-                "ID": chr(init_character + i),
-                "start": s,
-                "end": e,
-                "to": [],
-                "force_full_sequence": False,
-                "type": "default",
-                "info": list(),
-                "volta_numbers": list(),
-            }
-        segment_info[boundary_times[-1]] = {"ID": "END"}
+    boundary_times = list(boundaries.keys())
+    boundary_times.sort()
 
-        current_volta_repeat_start = 0
-        current_volta_end = 0
-        current_volta_total_number = 0
+    # for every segment get an id, its jump destinations and properties
+    init_character = 65
+    segment_info = dict()
+    for i, (s, e) in enumerate(zip(boundary_times[:-1], boundary_times[1:])):
+        segment_info[s] = {
+            "ID": chr(init_character + i),
+            "start": s,
+            "end": e,
+            "to": [],
+            "force_full_sequence": False,
+            "type": "default",
+            "info": list(),
+            "volta_numbers": list(),
+        }
+    segment_info[boundary_times[-1]] = {"ID": "END"}
 
-        for ss in boundary_times[:-1]:
-            se = segment_info[ss]["end"]
+    current_volta_repeat_start = 0
+    current_volta_end = 0
+    current_volta_total_number = 0
 
-            # loop through the boundaries at the end of current segment
-            for boundary_type in boundaries[se].keys():
-                # REPEATS
-                if boundary_type == "repeat_start":
+    for ss in boundary_times[:-1]:
+        se = segment_info[ss]["end"]
+
+        # loop through the boundaries at the end of current segment
+        for boundary_type in boundaries[se].keys():
+            # REPEATS
+            if boundary_type == "repeat_start":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+            if boundary_type == "repeat_end":
+                if "volta_end" not in list(boundaries[se].keys()):
                     segment_info[ss]["to"].append(segment_info[se]["ID"])
-                if boundary_type == "repeat_end":
-                    if "volta_end" not in list(boundaries[se].keys()):
-                        segment_info[ss]["to"].append(segment_info[se]["ID"])
-                        repeat_start = boundaries[se][boundary_type].start.t
-                        segment_info[ss]["to"].append(segment_info[repeat_start]["ID"])
-                    segment_info[ss]["info"].append("repeat_end")
+                    repeat_start = boundaries[se][boundary_type].start.t
+                    segment_info[ss]["to"].append(segment_info[repeat_start]["ID"])
+                segment_info[ss]["info"].append("repeat_end")
 
-                # VOLTA BRACKETS
-                if boundary_type == "volta_start":
-                    if "volta_end" not in list(boundaries[se].keys()):
-                        current_volta_total_number = 0
-                        current_volta_end = se
-                        for volta_number in range(
-                            10
-                        ):  # maximal expected number of volta brackets 10
-                            if "volta_start" in list(
-                                boundaries[current_volta_end].keys()
-                            ):
-                                # add the beginning to the jump destinations
-                                numbers = boundaries[current_volta_end][
-                                    "volta_start"
-                                ].number.split(",")
-                                numbers = [str(int(n)) for n in numbers]
-                                current_volta_total_number += len(numbers)
-                                for no in numbers:
-                                    segment_info[ss]["to"].append(
-                                        no
-                                        + "_Volta_"
-                                        + segment_info[current_volta_end]["ID"]
-                                    )
-                                segment_info[current_volta_end]["info"].append(
-                                    "volta " + ",".join(numbers)
+            # VOLTA BRACKETS
+            if boundary_type == "volta_start":
+                if "volta_end" not in list(boundaries[se].keys()):
+                    current_volta_total_number = 0
+                    current_volta_end = se
+                    for volta_number in range(
+                        10
+                    ):  # maximal expected number of volta brackets 10
+                        if "volta_start" in list(boundaries[current_volta_end].keys()):
+                            # add the beginning to the jump destinations
+                            numbers = boundaries[current_volta_end][
+                                "volta_start"
+                            ].number.split(",")
+                            numbers = [str(int(n)) for n in numbers]
+                            current_volta_total_number += len(numbers)
+                            for no in numbers:
+                                segment_info[ss]["to"].append(
+                                    no
+                                    + "_Volta_"
+                                    + segment_info[current_volta_end]["ID"]
                                 )
-                                segment_info[current_volta_end][
-                                    "volta_numbers"
-                                ] += numbers
-                                # segment_info[bracket_end]["info"].append(str(len(numbers)))
-                                # update the search time to the end of the ext bracket
-                                current_volta_end = boundaries[current_volta_end][
-                                    "volta_start"
-                                ].end.t
-
-                if boundary_type == "volta_end":
-                    current_volta_numbers = segment_info[ss]["volta_numbers"]
-                    for vn in current_volta_numbers:
-                        if vn != str(current_volta_total_number):
-                            # if repeating volta bracket, jump back to start
-                            # check if repeat exists (might not be for 3+ volta brackets)
-                            if "repeat_end" in list(boundaries[se].keys()):
-                                current_volta_repeat_start = max(
-                                    boundaries[se]["repeat_end"].start.t,
-                                    current_volta_repeat_start,
-                                )
-                            repeat_start = current_volta_repeat_start
-                            segment_info[ss]["to"].append(
-                                "Z_Volta_" + segment_info[repeat_start]["ID"]
+                            segment_info[current_volta_end]["info"].append(
+                                "volta " + ",".join(numbers)
                             )
+                            segment_info[current_volta_end]["volta_numbers"] += numbers
+                            # segment_info[bracket_end]["info"].append(str(len(numbers)))
+                            # update the search time to the end of the ext bracket
+                            current_volta_end = boundaries[current_volta_end][
+                                "volta_start"
+                            ].end.t
 
-                    if str(current_volta_total_number) in current_volta_numbers:
-                        # else just go to the segment after the last
+            if boundary_type == "volta_end":
+                current_volta_numbers = segment_info[ss]["volta_numbers"]
+                for vn in current_volta_numbers:
+                    if vn != str(current_volta_total_number):
+                        # if repeating volta bracket, jump back to start
+                        # check if repeat exists (might not be for 3+ volta brackets)
+                        if "repeat_end" in list(boundaries[se].keys()):
+                            current_volta_repeat_start = max(
+                                boundaries[se]["repeat_end"].start.t,
+                                current_volta_repeat_start,
+                            )
+                        repeat_start = current_volta_repeat_start
                         segment_info[ss]["to"].append(
-                            segment_info[current_volta_end]["ID"]
+                            "Z_Volta_" + segment_info[repeat_start]["ID"]
                         )
 
-                # NAVIGATION SYMBOLS
+                if str(current_volta_total_number) in current_volta_numbers:
+                    # else just go to the segment after the last
+                    segment_info[ss]["to"].append(segment_info[current_volta_end]["ID"])
 
-                # Navigation1_ = destinations that should only be used after all others
-                # Navigation2_ = destinations that are used *after* a jump
-                if boundary_type == "coda":
-                    # if a coda symbol is passed just continue
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    segment_info[se]["type"] = "leap_end"
-                    segment_info[se]["info"].append("Coda")
+            # NAVIGATION SYMBOLS
 
-                if boundary_type == "tocoda":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # find the coda and jump there
-                    coda_time = destinations["coda"][0]
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[coda_time]["ID"]
-                    )
-                    segment_info[ss]["type"] = "leap_start"
-                    segment_info[ss]["info"].append("al coda")
+            # Navigation1_ = destinations that should only be used after all others
+            # Navigation2_ = destinations that are used *after* a jump
+            if boundary_type == "coda":
+                # if a coda symbol is passed just continue
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                segment_info[se]["type"] = "leap_end"
+                segment_info[se]["info"].append("Coda")
 
-                if boundary_type == "segno":
-                    # if a segno symbol is passed just continue
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    segment_info[se]["type"] = "leap_end"
-                    segment_info[se]["info"].append("segno")
+            if boundary_type == "tocoda":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # find the coda and jump there
+                coda_time = destinations["coda"][0]
+                segment_info[ss]["to"].append(
+                    "Navigation2_" + segment_info[coda_time]["ID"]
+                )
+                segment_info[ss]["type"] = "leap_start"
+                segment_info[ss]["info"].append("al coda")
 
-                if boundary_type == "dalsegno":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # find the segno and jump there
-                    segno_time = destinations["segno"][0]
-                    segment_info[ss]["to"].append(
-                        "Navigation1_" + segment_info[segno_time]["ID"]
-                    )
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[se]["ID"]
-                    )
-                    segment_info[ss]["type"] = "leap_start"
-                    segment_info[ss]["info"].append("dal segno")
+            if boundary_type == "segno":
+                # if a segno symbol is passed just continue
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                segment_info[se]["type"] = "leap_end"
+                segment_info[se]["info"].append("segno")
 
-                if boundary_type == "dacapo":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # jump to the start
-                    segment_info[ss]["to"].append(
-                        "Navigation1_" + segment_info[part.first_point.t]["ID"]
-                    )
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[se]["ID"]
-                    )
-                    segment_info[ss]["type"] = "leap_start"
-                    segment_info[ss]["info"].append("da capo")
+            if boundary_type == "dalsegno":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # find the segno and jump there
+                segno_time = destinations["segno"][0]
+                segment_info[ss]["to"].append(
+                    "Navigation1_" + segment_info[segno_time]["ID"]
+                )
+                segment_info[ss]["to"].append("Navigation2_" + segment_info[se]["ID"])
+                segment_info[ss]["type"] = "leap_start"
+                segment_info[ss]["info"].append("dal segno")
 
-                if boundary_type == "fine":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
-                    # jump to the start
-                    segment_info[ss]["to"].append(
-                        "Navigation2_" + segment_info[part.last_point.t]["ID"]
-                    )
-                    segment_info[ss]["info"].append("fine")
+            if boundary_type == "dacapo":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # jump to the start
+                segment_info[ss]["to"].append(
+                    "Navigation1_" + segment_info[part.first_point.t]["ID"]
+                )
+                segment_info[ss]["to"].append("Navigation2_" + segment_info[se]["ID"])
+                segment_info[ss]["type"] = "leap_start"
+                segment_info[ss]["info"].append("da capo")
 
-                # GENERIC
-                if boundary_type == "end":
-                    segment_info[ss]["to"].append(segment_info[se]["ID"])
+            if boundary_type == "fine":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
+                # jump to the start
+                segment_info[ss]["to"].append(
+                    "Navigation2_" + segment_info[part.last_point.t]["ID"]
+                )
+                segment_info[ss]["info"].append("fine")
 
-                # first segments is always a leap destination (da capo)
-                if ss == 0:
-                    segment_info[ss]["type"] = "leap_end"
+            # GENERIC
+            if boundary_type == "end":
+                segment_info[ss]["to"].append(segment_info[se]["ID"])
 
-        # clean up and ORDER all the jump destination information
-        for start_time in boundary_times[:-1]:
-            destinations = segment_info[start_time]["to"]
-            destinations_no_volta = [
-                dest
-                for dest in destinations
-                if "Volta_" not in dest and "Navigation" not in dest
-            ]
-            destinations_volta = [dest for dest in destinations if "Volta_" in dest]
-            # dal segno and da capo
-            destinations_navigation1 = [
-                dest[12:] for dest in destinations if "Navigation1_" in dest
-            ]
-            # al coda and fine
-            destinations_navigation2 = [
-                dest[12:] for dest in destinations if "Navigation2_" in dest
-            ]
+            # first segments is always a leap destination (da capo)
+            if ss == 0:
+                segment_info[ss]["type"] = "leap_end"
 
-            # sort the repeats by ascending segment ID
-            destinations_no_volta = list(set(destinations_no_volta))
-            # make sure the "END" destination is the last
-            destinations_except_await = (
-                destinations_volta + destinations_no_volta + destinations_navigation1
-            )
-            if "END" in destinations_except_await:
-                while "END" in destinations_no_volta:
-                    destinations_no_volta.remove("END")
-                destinations_navigation1.append("END")
+    # clean up and ORDER all the jump destination information
+    for start_time in boundary_times[:-1]:
+        destinations = segment_info[start_time]["to"]
+        destinations_no_volta = [
+            dest
+            for dest in destinations
+            if "Volta_" not in dest and "Navigation" not in dest
+        ]
+        destinations_volta = [dest for dest in destinations if "Volta_" in dest]
+        # dal segno and da capo
+        destinations_navigation1 = [
+            dest[12:] for dest in destinations if "Navigation1_" in dest
+        ]
+        # al coda and fine
+        destinations_navigation2 = [
+            dest[12:] for dest in destinations if "Navigation2_" in dest
+        ]
 
-            # sort repeat destinations by ascending ID
-            destinations_no_volta.sort()
-            # sort destinations by volta number
-            destinations_volta.sort()
-            # keep only the segment IDs
-            destinations_volta = [d[8:] for d in destinations_volta]
-            # don't jump to volta brackets w/t number
-            destinations_no_volta = [
-                d for d in destinations_no_volta if d not in destinations_volta
-            ]
-            destinations_cleaned = (
-                destinations_volta + destinations_no_volta + destinations_navigation1
-            )
+        # sort the repeats by ascending segment ID
+        destinations_no_volta = list(set(destinations_no_volta))
+        # make sure the "END" destination is the last
+        destinations_except_await = (
+            destinations_volta + destinations_no_volta + destinations_navigation1
+        )
+        if "END" in destinations_except_await:
+            while "END" in destinations_no_volta:
+                destinations_no_volta.remove("END")
+            destinations_navigation1.append("END")
 
-            # if len(destinations_navigation2) > 0:
-            #     # keep only jumps to the past
-            #     await_to = [idx for idx in destinations_cleaned if idx <= segment_info[start_time]["ID"]]
-            #     # add the waiting destinations
-            #     await_to += destinations_navigation2
+        # sort repeat destinations by ascending ID
+        destinations_no_volta.sort()
+        # sort destinations by volta number
+        destinations_volta.sort()
+        # keep only the segment IDs
+        destinations_volta = [d[8:] for d in destinations_volta]
+        # don't jump to volta brackets w/t number
+        destinations_no_volta = [
+            d for d in destinations_no_volta if d not in destinations_volta
+        ]
+        destinations_cleaned = (
+            destinations_volta + destinations_no_volta + destinations_navigation1
+        )
 
-            # else:
-            #     await_to = destinations_cleaned
-
-            part.add(
-                Segment(
-                    id=segment_info[start_time]["ID"],
-                    to=destinations_cleaned,
-                    await_to=destinations_navigation2,  # await_to,
-                    force_seq=segment_info[start_time]["force_full_sequence"],
-                    type=segment_info[start_time]["type"],
-                    info=", ".join(segment_info[start_time]["info"]),
-                ),
-                segment_info[start_time]["start"],
-                segment_info[start_time]["end"],
-            )
+        part.add(
+            Segment(
+                id=segment_info[start_time]["ID"],
+                to=destinations_cleaned,
+                await_to=destinations_navigation2,  # await_to,
+                force_seq=segment_info[start_time]["force_full_sequence"],
+                type=segment_info[start_time]["type"],
+                info=", ".join(segment_info[start_time]["info"]),
+            ),
+            segment_info[start_time]["start"],
+            segment_info[start_time]["end"],
+        )
 
 
 def get_segments(part):
@@ -4927,7 +5101,7 @@ def get_paths(part, no_repeats=False, all_repeats=False, ignore_leap_info=True):
     segments = get_segments(part)
     paths = list()
     unfold_paths(
-        Path(["A"], segments, no_repeats=no_repeats, all_repeats=all_repeats),
+        Path([chr(65)], segments, no_repeats=no_repeats, all_repeats=all_repeats),
         paths,
         ignore_leap_info=ignore_leap_info,
     )
@@ -5359,6 +5533,10 @@ def merge_parts(parts, reassign="voice"):
         If "voice", the new part have only one staff, and as manually
         voices as the sum of the voices in parts; the voice number
         get reassigned.
+        If "both", we reassign all the staves and voices to have unique staff
+        and voice numbers. According to musicxml standards, we consider 4 voices
+        per staff. So for example staff 1 will have voices 1,2,3,4, staff 2 will
+        have voices 5,6,7,8, and so on.
 
     Returns
     -------
@@ -5367,7 +5545,7 @@ def merge_parts(parts, reassign="voice"):
 
     """
     # check if reassign has valid values
-    if reassign not in ["staff", "voice"]:
+    if reassign not in ["staff", "voice", "auto"]:
         raise ValueError(
             "Only 'staff' and 'voice' are supported ressign values. Found", reassign
         )
@@ -5405,26 +5583,16 @@ def merge_parts(parts, reassign="voice"):
     new_part._quarter_durations = [lcm]
 
     note_arrays = [part.note_array(include_staff=True) for part in parts]
-    # find the maximum number of voices for each part (voice number start from 1)
-    maximum_voices = [
-        (
-            max(note_array["voice"], default=0)
-            if max(note_array["voice"], default=0) != 0
-            else 1
-        )
-        for note_array in note_arrays
-    ]
-    # find the maximum number of staves for each part (staff number start from 0 but we force them to 1)
-    maximum_staves = [
-        (
-            max(note_array["staff"], default=0)
-            if max(note_array["staff"], default=0) != 0
-            else 1
-        )
-        for note_array in note_arrays
-    ]
+    # find the unique number of voices for each part (voice numbers start from 1)
+    unique_voices = [np.unique(note_array["voice"]) for note_array in note_arrays]
+    # find the unique number of staves for each part
+    unique_staves = [np.unique(note_array["staff"]) for note_array in note_arrays]
+    # find the maximum number of voices for each part (voice numbers start from 1)
+    maximum_voices = [max(unique_voice, default=1) for unique_voice in unique_voices]
+    # find the maximum number of staves for each part
+    maximum_staves = [max(unique_staff, default=1) for unique_staff in unique_staves]
 
-    if reassign == "staff":
+    if reassign in ["staff", "auto"]:
         el_to_discard = (
             Barline,
             Page,
@@ -5455,6 +5623,31 @@ def merge_parts(parts, reassign="voice"):
         )
 
     for p_ind, p in enumerate(parts):
+        if reassign == "auto":
+            # find how many staves this part has
+            n_staves = len(unique_staves[p_ind])
+            # find total number of staves in previous parts
+            if p_ind == 0:
+                n_previous_staves = 0
+            else:
+                n_previous_staves = sum(
+                    [len(unique_staff) for unique_staff in unique_staves[:p_ind]]
+                )
+            # build a mapping between the old staff numbers and the new staff numbers
+            staff_mapping = dict(
+                zip(
+                    unique_staves[p_ind], n_previous_staves + np.arange(1, n_staves + 1)
+                )
+            )
+            # find how many voices this part has
+            n_voices = len(unique_voices[p_ind])
+            # build a mapping between the old and new voices
+            voice_mapping = dict(
+                zip(
+                    unique_voices[p_ind],
+                    n_previous_staves * 4 + np.arange(1, n_voices + 1),
+                )
+            )
         for e in p.iter_all():
             # full copy the first part and partially copy the others
             # we don't copy elements like duplicate barlines, clefs or
@@ -5474,16 +5667,17 @@ def merge_parts(parts, reassign="voice"):
                     if isinstance(e, GenericNote):
                         e.voice = e.voice + sum(maximum_voices[:p_ind])
                 elif reassign == "staff":
-                    if isinstance(e, (GenericNote, Words, Direction)):
+                    if isinstance(e, (GenericNote, Words, Direction, Clef)):
                         e.staff = (e.staff if e.staff is not None else 1) + sum(
                             maximum_staves[:p_ind]
                         )
-                    elif isinstance(
-                        e, Clef
-                    ):  # TODO: to update if "number" get changed in "staff"
-                        e.staff = (e.staff if e.staff is not None else 1) + sum(
-                            maximum_staves[:p_ind]
-                        )
+                elif reassign == "auto":
+                    # assign based on the voice and staff mappings
+                    if isinstance(e, GenericNote):
+                        # new voice is computed as the sum of voices in staves in previous parts, plus the current
+                        e.voice = voice_mapping[e.voice]
+                    if isinstance(e, (GenericNote, Words, Direction, Clef)):
+                        e.staff = staff_mapping[e.staff]
                 new_part.add(e, start=new_start, end=new_end)
 
                 # new_part.add(copy.deepcopy(e), start=new_start, end=new_end)
@@ -5940,8 +6134,8 @@ Roman2Interval_Min = {
     "iii": Interval(3, "m"),
     "iv": Interval(4, "P"),
     "v": Interval(5, "P"),
-    "vi": Interval(6, "m"),
-    "vii": Interval(7, "m"),
+    "vi": Interval(6, "M"),
+    "vii": Interval(7, "M"),
     "viio": Interval(7, "M"),
     "N": Interval(2, "m"),
     "iio": Interval(2, "M"),
