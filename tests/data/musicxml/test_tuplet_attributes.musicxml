@@ -8,7 +8,7 @@
     <creator type="composer">Compositeur / Arrangeur</creator>
     <encoding>
       <software>MuseScore 4.4.4</software>
-      <encoding-date>2025-01-22</encoding-date>
+      <encoding-date>2025-02-05</encoding-date>
       <supports element="accidental" type="yes"/>
       <supports element="beam" type="yes"/>
       <supports element="print" attribute="new-page" type="no"/>
@@ -111,7 +111,6 @@
         <time-modification>
           <actual-notes>5</actual-notes>
           <normal-notes>4</normal-notes>
-          <normal-type>eighth</normal-type>
           </time-modification>
         <stem>up</stem>
         <beam number="1">begin</beam>
@@ -130,7 +129,6 @@
         <time-modification>
           <actual-notes>5</actual-notes>
           <normal-notes>4</normal-notes>
-          <normal-type>eighth</normal-type>
           </time-modification>
         <stem>up</stem>
         <beam number="1">continue</beam>
@@ -209,7 +207,6 @@
         <time-modification>
           <actual-notes>5</actual-notes>
           <normal-notes>4</normal-notes>
-          <normal-type>eighth</normal-type>
           </time-modification>
         <stem>up</stem>
         <beam number="1">continue</beam>
@@ -225,7 +222,6 @@
         <time-modification>
           <actual-notes>5</actual-notes>
           <normal-notes>4</normal-notes>
-          <normal-type>eighth</normal-type>
           </time-modification>
         <stem>up</stem>
         <beam number="1">end</beam>
@@ -396,7 +392,7 @@
     <measure number="2">
       <attributes>
         <time>
-          <beats>6</beats>
+          <beats>9</beats>
           <beat-type>8</beat-type>
           </time>
         </attributes>
@@ -446,12 +442,14 @@
         <type>eighth</type>
         <time-modification>
           <actual-notes>5</actual-notes>
-          <normal-notes>3</normal-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+          <normal-dot/>
           </time-modification>
         <stem>up</stem>
         <beam number="1">begin</beam>
         <notations>
-          <tuplet type="start" bracket="yes" show-number="both"/>
+          <tuplet type="start" bracket="yes"/>
           </notations>
         </note>
       <note>
@@ -464,55 +462,76 @@
         <type>eighth</type>
         <time-modification>
           <actual-notes>5</actual-notes>
-          <normal-notes>3</normal-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+          <normal-dot/>
           </time-modification>
         <stem>up</stem>
-        <beam number="1">continue</beam>
+        <beam number="1">end</beam>
         </note>
       <note>
         <pitch>
           <step>E</step>
           <octave>4</octave>
           </pitch>
-        <duration>54</duration>
+        <duration>108</duration>
         <voice>1</voice>
-        <type>eighth</type>
+        <type>quarter</type>
         <time-modification>
           <actual-notes>5</actual-notes>
-          <normal-notes>3</normal-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+          <normal-dot/>
           </time-modification>
         <stem>up</stem>
-        <beam number="1">continue</beam>
         </note>
       <note>
         <pitch>
           <step>F</step>
           <octave>4</octave>
           </pitch>
-        <duration>54</duration>
+        <duration>108</duration>
         <voice>1</voice>
-        <type>eighth</type>
+        <type>quarter</type>
         <time-modification>
           <actual-notes>5</actual-notes>
-          <normal-notes>3</normal-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+          <normal-dot/>
           </time-modification>
         <stem>up</stem>
-        <beam number="1">continue</beam>
         </note>
       <note>
         <pitch>
           <step>G</step>
           <octave>4</octave>
           </pitch>
-        <duration>54</duration>
+        <duration>108</duration>
         <voice>1</voice>
-        <type>eighth</type>
+        <type>quarter</type>
         <time-modification>
           <actual-notes>5</actual-notes>
-          <normal-notes>3</normal-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+          <normal-dot/>
           </time-modification>
         <stem>up</stem>
-        <beam number="1">end</beam>
+        </note>
+      <note>
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
+          </pitch>
+        <duration>108</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+        <time-modification>
+          <actual-notes>5</actual-notes>
+          <normal-notes>2</normal-notes>
+          <normal-type>quarter</normal-type>
+          <normal-dot/>
+          </time-modification>
+        <stem>up</stem>
         <notations>
           <tuplet type="stop"/>
           </notations>
