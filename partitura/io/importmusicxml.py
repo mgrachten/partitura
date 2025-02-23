@@ -1573,6 +1573,19 @@ def handle_tuplets(notations, ongoing, note):
         assert (
             start_tuplet.start_note.start.t <= stop_tuplet.end_note.start.t
         ), "Tuplet start time is after tuplet stop time"
+
+    # check that tuplets start and end notes belong to the same voice
+    for tuplet in starting_tuplets + stopping_tuplets:
+        if (
+            tuplet.start_note is not None
+            and tuplet.end_note is not None
+            and (tuplet.start_note.voice != tuplet.end_note.voice)
+        ):
+            warnings.warn(
+                f"Tuplet start and end notes do not belong to the same voice "
+                f"({tuplet.start_note.voice} != {tuplet.end_note.voice}). This might "
+                f'indicate a missing <tuplet type="start"> or <tuplet type="stop">.'
+            )
     return starting_tuplets, stopping_tuplets
 
 
