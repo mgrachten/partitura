@@ -267,11 +267,12 @@ def adjust_offsets_w_sustain(
     first_off = np.min(offs)
     last_off = np.max(offs)
 
-    # Get pedal times
+    # get pedal times
     pedal = np.array(
         [(x["time"], x["value"] > threshold) for x in controls if x["number"] == 64]
     )
 
+    # if there is no pedal info, assume pedal is off
     if len(pedal) == 0:
         for note in notes:
             note["sound_off"] = note["note_off"]
@@ -291,13 +292,15 @@ def adjust_offsets_w_sustain(
             (max(pedal[-1, 0] + 1, last_off + 1), 0),
         )
     )
+    # find pedal state at note offsets
     last_pedal_change_before_off = np.searchsorted(pedal[:, 0], offs) - 1
-
     pedal_state_at_off = pedal[last_pedal_change_before_off, 1]
     pedal_down_at_off = pedal_state_at_off == 1
     next_pedal_time = pedal[last_pedal_change_before_off + 1, 0]
-
-    offs[pedal_down_at_off] = next_pedal_time[pedal_down_at_off]
+    
+    # adjust the note offset
+    # for notes where the pedal is down at the note-off time, adjusts the note off time to the next pedal change time if it is later
+    offs[pedal_down_at_off] = np.maximum(next_pedal_time[pedal_down_at_off], offs[pedal_down_at_off])
 
     # adjust offset times of notes that have a reonset while the sustain pedal is on
     pitches = np.array([n["midi_pitch"] for n in notes])
@@ -313,9 +316,10 @@ def adjust_offsets_w_sustain(
         adjusted_sound_offs = np.minimum(sorted_sound_offs[:-1], sorted_note_ons[1:])
 
         offs[sorted_indices[:-1]] = adjusted_sound_offs
-
+    
+    # adjust the sound off
     for offset, note in zip(offs, notes):
-        note["sound_off"] = offset
+        note["sound_off"] = max(offset, note["note_off"])
 
 
 class PerformedNote:
