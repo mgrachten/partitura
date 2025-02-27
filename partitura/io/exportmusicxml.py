@@ -36,6 +36,23 @@ ARTICULATIONS = [
     "tenuto",
     "unstress",
 ]
+ORNAMENTS = [
+    "trill-mark",
+    "turn",
+    "delayed-turn",
+    "inverted-turn",
+    "delayed-inverted-turn",
+    "vertical-turn",
+    "inverted-vertical-turn",
+    "shake",
+    "wavy-line",
+    "mordent",
+    "inverted-mordent",
+    "schleifer",
+    "tremolo",
+    "haydn",
+    "other-ornament",
+]
 
 
 def range_number_from_counter(e, label, counter):
@@ -153,6 +170,16 @@ def make_note_el(note, dur, voice, counter, n_of_staves):
             articulations_e = etree.Element("articulations")
             articulations_e.extend(articulations)
             notations.append(articulations_e)
+
+    if note.ornaments:
+        ornaments = []
+        for ornament in note.ornaments:
+            if ornament in ORNAMENTS:
+                ornaments.append(etree.Element(ornament))
+        if ornaments:
+            ornaments_e = etree.Element("ornaments")
+            ornaments_e.extend(ornaments)
+            notations.append(ornaments_e)
 
     if note.technical:
         technical = []
