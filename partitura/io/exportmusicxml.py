@@ -184,6 +184,8 @@ def make_note_el(note, dur, voice, counter, n_of_staves):
         actual_e.text = str(sym_dur["actual_notes"])
         normal_e = etree.SubElement(time_mod_e, "normal-notes")
         normal_e.text = str(sym_dur["normal_notes"])
+        for _ in range(sym_dur.get("normal_dots", 0)):
+            etree.SubElement(time_mod_e, "normal-dot")
 
     if note.staff is not None:
         if note.staff != 1 or n_of_staves > 1:
@@ -240,12 +242,16 @@ def make_note_el(note, dur, voice, counter, n_of_staves):
             tuplet_actual_notes_e.text = str(tuplet.actual_notes)
             tuplet_actual_type_e = etree.SubElement(tuplet_actual_e, "tuplet-type")
             tuplet_actual_type_e.text = str(tuplet.actual_type)
+            for _ in range(tuplet.actual_dots):
+                etree.SubElement(tuplet_actual_e, "tuplet-dot")
             # tuplet-normal tag
             tuplet_normal_e = etree.SubElement(tuplet_e, "tuplet-normal")
             tuplet_normal_notes_e = etree.SubElement(tuplet_normal_e, "tuplet-number")
             tuplet_normal_notes_e.text = str(tuplet.normal_notes)
             tuplet_normal_type_e = etree.SubElement(tuplet_normal_e, "tuplet-type")
             tuplet_normal_type_e.text = str(tuplet.normal_type)
+            for _ in range(tuplet.normal_dots):
+                etree.SubElement(tuplet_normal_e, "tuplet-dot")
         notations.append(tuplet_e)
 
     if notations:
