@@ -1293,19 +1293,19 @@ def _handle_note(e, position, part, ongoing, prev_note, doc_order, prev_beam=Non
     if articulations_e is not None:
         articulations = get_articulations(articulations_e)
     else:
-        articulations = {}
+        articulations = []
 
     ornaments_e = e.find("notations/ornaments")
     if ornaments_e is not None:
         ornaments = get_ornaments(ornaments_e)
     else:
-        ornaments = {}
+        ornaments = []
 
     technical_e = e.find("notations/technical")
     if technical_e is not None:
         technical_notations = get_technical_notations(technical_e)
     else:
-        technical_notations = {}
+        technical_notations = []
 
     pitch = e.find("pitch")
     unpitch = e.find("unpitched")
