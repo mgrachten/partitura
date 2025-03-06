@@ -1090,8 +1090,8 @@ class Part(object):
 
         Parameters
         ----------
-        cls : class, optional
-            The class of objects to iterate over. If omitted, iterate
+        cls : class or iterable of classes, optional
+            The class (or classes) of objects to iterate over. If omitted, iterate
             over all objects in the part.
         start : :class:`TimePoint`, optional
             The start of the interval to search. If omitted or None,
@@ -1135,12 +1135,21 @@ class Part(object):
             cls = object
             include_subclasses = True
 
+        # If single class passed, convert to list
+        if isinstance(cls, type):
+            cls = [cls]
+
+        if not isinstance(cls, Iterable):
+            raise TypeError("cls should be a class, an iterable of classes, or None")
+
         if mode == "ending":
             for tp in self._points[start_idx:end_idx]:
-                yield from tp.iter_ending(cls, include_subclasses)
+                for c in cls:
+                    yield from tp.iter_ending(c, include_subclasses)
         else:
             for tp in self._points[start_idx:end_idx]:
-                yield from tp.iter_starting(cls, include_subclasses)
+                for c in cls:
+                    yield from tp.iter_starting(c, include_subclasses)
 
     def apply(self):
         """Apply all changes to the timeline for objects like octave Shift."""
