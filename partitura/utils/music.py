@@ -3330,6 +3330,114 @@ def step2pc(step, alter):
     return pc
 
 
+def get_last_cc_values(
+        perf_controls: list, 
+        control_numbers: list
+        ) -> dict:
+    """
+    Get the last control change values from the cc messages in the performed part for each control number given in control_numbers.
+
+    Parameters
+    ----------
+    perf_controls : list
+        A list of dictionaries where each dictionary contains the control change data in the performed part.
+    control_numbers : list
+        A list of integers representing the control change numbers that exist in the performed part.
+
+    Returns
+    -------
+    dict
+        A dictionary where the keys are the control change numbers and the values are dictionaries containing 
+        the last control change value, track, and channel in the performed part for each control change number.
+    """
+
+    last_cc_values = {}
+    
+    for i in range(len(perf_controls) - 1, -1, -1):
+        # if we have found the last control change value for each control number, break the loop
+        if len(last_cc_values) == len(control_numbers):
+            break
+        
+        control = perf_controls[i]
+
+        # if the control number is already in the last_cc_values dictionary 
+        # (i.e, the last value for this cc number in the performed part has been found), 
+        # skip to the next control number
+        if control['number'] in last_cc_values:
+            continue
+
+        last_cc_values[control['number']] = {}
+        last_cc_values[control['number']]['value'] = control['value']
+        last_cc_values[control['number']]['track'] = control['track']
+        last_cc_values[control['number']]['channel'] = control['channel']
+        
+    return last_cc_values
+
+
+def segment_and_export_ppart_by_gap(
+        ppart: PerformedPart,
+        output_dir: str, 
+        gap: float = 8.0,
+        ):
+    """
+    Segment a performed part by a given gap (in seconds) between the 'note_on' values of 
+    consecutive notes and export the segments as MIDI files.
+
+    Parameters
+    ----------
+    ppart : PerformedPart
+        A PerformedPart object representing the performed part.
+    output_dir : str
+        The directory where the segmented MIDI files will be saved.
+    gap : float
+        The minimum gap between notes to split the segment. The default is 8.0.
+    """
+
+    perf_notes = ppart.notes
+    perf_controls = ppart.controls
+
+    # find the indices of the notes in perf_notes where the gap between 
+    # consecutive notes' 'note_on' and 'note_off' values is greater than the threshold.
+    note_ons = np.array([note['note_on'] for note in perf_notes])
+    note_offs = np.array([note['note_off'] for note in perf_notes]) # TODO: Consider changing to 'sound_off' instead of 'note_off'
+
+    # Calculate the differences between consecutive note_on and note_off values
+    note_gaps = note_ons[1:] - note_offs[:-1]
+
+    # Find the indices where the gap is greater than the threshold
+    split_indices = np.where(note_gaps > gap)[0] + 1
+
+    # Find the start and end times for each segment
+    start_times = np.insert(note_ons[split_indices], 0, 0)
+    end_times = np.append(note_ons[split_indices] - 0.001, note_offs[-1])
+
+    # find all the unique 'number' values in perf.controls
+    cc_nums_in_ppart = list(set([control['number'] for control in perf_controls]))
+
+
+    for i in range(len(start_times)):
+        ppart_segment = slice_ppart_by_time(ppart, start_times[i], end_times[i])
+
+        # from the second segment onwards, add the last control values from the previous segment to the current segment.
+        if i != 0: 
+            segment_first_note = ppart_segment.notes[0]
+            for cc in last_control_values:
+                first_cc = {}
+                first_cc['number'] = cc
+                first_cc['value'] = last_control_values[cc]['value']
+                first_cc['track'] = last_control_values[cc]['track']
+                first_cc['channel'] = last_control_values[cc]['channel']
+                first_cc['time'] = segment_first_note['note_on']
+                first_cc['time_tick'] = segment_first_note['note_on_tick']
+                ppart_segment.controls.insert(0, first_cc)
+        
+        last_control_values = get_last_cc_values(ppart_segment.controls, cc_nums_in_ppart)
+        output_path = output_dir + f"/segment_{i}.mid"
+        partitura.save_performance_midi(ppart_segment, output_path)
+
+    return
+
+
 if __name__ == "__main__":
     import doctest
 
